@@ -182,6 +182,114 @@ uv run python scripts/init_db.py
 - 所有数据表已创建（documents, document_blocks, whiteboard_data, chart_3d, ai_chat_sessions, ai_messages, knowledge_chunks, document_summaries, code_executions, file_assets, system_logs）
 - 表结构包含正确的字段和约束
 
+## 阶段 2：文档管理 API ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 2.1：实现文档 Service 层 ✅
+
+**修改的文件**:
+- `backend/app/services/__init__.py` - 包初始化文件
+- `backend/app/services/document_service.py` - 文档管理核心业务逻辑
+
+**完成内容**:
+- `create_document` — 创建文档，自动计算 path 和 sort_order，验证父文档存在
+- `get_document_tree` — 查询所有未删除文档，递归组装树状结构
+- `get_document_detail` — 获取文档详情（包含 blocks 列表）
+- `update_document` — 更新文档，title 变更时同步更新所有子文档 path
+- `delete_document` — 软删除文档，级联软删除所有子文档
+- `get_document_path` — 获取文档完整路径
+
+### 步骤 2.2：实现 Block Service 层 ✅
+
+**修改的文件**:
+- `backend/app/services/block_service.py` - Block 管理核心业务逻辑
+
+**完成内容**:
+- `create_block` — 创建 block，验证文档存在和 block_type 合法
+- `batch_save_blocks` — 批量保存 blocks（删除旧的，插入新的），使用事务确保原子性
+- `update_block` — 更新 block 的 content 和/或 properties
+- `delete_block` — 删除 block 及其关联的白板数据、图表数据
+- `get_blocks_by_document` — 获取指定文档的所有 block
+
+### 步骤 2.3：实现文档 API 路由 ✅
+
+**修改的文件**:
+- `backend/app/routers/__init__.py` - 包初始化文件
+- `backend/app/routers/documents.py` - 文档管理 REST API
+
+**完成内容**:
+- `POST /api/documents` — 创建文档
+- `GET /api/documents/tree` — 获取文档树
+- `GET /api/documents/{document_id}` — 获取文档详情
+- `PATCH /api/documents/{document_id}` — 更新文档
+- `DELETE /api/documents/{document_id}` — 删除文档
+- `PUT /api/documents/{document_id}/blocks` — 批量保存 blocks
+- `POST /api/documents/{document_id}/blocks` — 创建单个 block
+
+### 步骤 2.4：实现 Block API 路由 ✅
+
+**修改的文件**:
+- `backend/app/routers/blocks.py` - Block 管理 REST API
+
+**完成内容**:
+- `PATCH /api/blocks/{block_id}` — 更新 block
+- `DELETE /api/blocks/{block_id}` — 删除 block
+
+### 步骤 2.5：编写文档 API 测试 ✅
+
+**修改的文件**:
+- `backend/tests/__init__.py` - 包初始化文件
+- `backend/tests/conftest.py` - 测试配置（SQLite 内存数据库、测试客户端）
+- `backend/tests/test_documents.py` — 文档 API 测试（11 个用例）
+- `backend/tests/test_blocks.py` — Block API 测试（7 个用例）
+
+**完成内容**:
+- 文档 CRUD 完整流程测试
+- 文档树正确构建测试
+- Block 创建、更新、删除测试
+- 批量保存 blocks 测试
+- 文档嵌套和路径计算测试
+- 软删除行为测试（包括级联删除）
+- Block 排序测试
+
+**其他修改**:
+- `backend/app/main.py` — 注册文档和 Block 路由
+- `backend/pyproject.toml` — 添加 aiosqlite 测试依赖
+
+## 如何测试阶段 2
+
+### 1. 运行自动化测试
+
+```bash
+cd backend
+uv run pytest tests/ -v
+```
+
+验证：18 个测试全部通过
+
+### 2. 手动测试 API（需要 PostgreSQL）
+
+```bash
+# 确保 PostgreSQL 已启动并初始化数据库
+uv run python scripts/init_db.py
+
+# 启动服务
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+访问 http://localhost:8000/docs 使用 Swagger UI 测试以下接口：
+
+1. **创建文档**: POST /api/documents — 发送 `{"title": "测试文档"}`
+2. **获取文档树**: GET /api/documents/tree
+3. **获取文档详情**: GET /api/documents/{id}
+4. **更新文档**: PATCH /api/documents/{id} — 发送 `{"title": "新标题"}`
+5. **删除文档**: DELETE /api/documents/{id}
+6. **批量保存 blocks**: PUT /api/documents/{id}/blocks
+7. **创建 block**: POST /api/documents/{id}/blocks
+8. **更新 block**: PATCH /api/blocks/{id}
+9. **删除 block**: DELETE /api/blocks/{id}
+
 ## 下一步
 
-阶段 1 已完成，可以开始阶段 2：文档管理 API。
+阶段 2 已完成，可以开始阶段 3：前端与后端对接（替换 Mock 数据）。

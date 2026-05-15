@@ -111,10 +111,14 @@ async def root():
     }
 
 
-# 注意：后续步骤会在这里添加路由
-# from app.routers import documents, blocks, ai, rag, code_execution, charts, files, system
-# app.include_router(documents.router, prefix="/api/documents", tags=["文档管理"])
-# app.include_router(blocks.router, prefix="/api/blocks", tags=["Block 管理"])
+# 注册路由
+from app.routers import documents, blocks  # noqa: E402
+
+app.include_router(documents.router, prefix="/api/documents", tags=["文档管理"])
+app.include_router(blocks.router, prefix="/api/blocks", tags=["Block 管理"])
+
+# 后续阶段添加的路由：
+# from app.routers import ai, rag, code_execution, charts, files, system
 # app.include_router(ai.router, prefix="/api/ai", tags=["AI 对话"])
 # app.include_router(rag.router, prefix="/api/rag", tags=["RAG 检索"])
 # app.include_router(code_execution.router, prefix="/api/code-executions", tags=["代码执行"])
