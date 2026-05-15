@@ -57,9 +57,9 @@ export function SlashCommandMenu() {
   const activeHighlightIdx = Math.max(0, Math.min(highlightIdx, flatItems.length - 1));
 
   const insertBlock = useCallback(
-    (type: BlockType) => {
+    async (type: BlockType) => {
       const content = emptyContentForType(type);
-      const nextBlockId = addBlockFromSlash(
+      const nextBlockId = await addBlockFromSlash(
         slashMenuContext?.docId || activeDocId,
         type,
         content,

@@ -109,8 +109,8 @@ async def insert_seed_data():
     logger.info("正在插入种子数据...")
 
     try:
-        # 暂时跳过种子数据插入（后续阶段实现）
-        logger.info("种子数据插入已跳过（待后续阶段实现）")
+        from scripts.seed_data import seed_all
+        await seed_all()
     except Exception as e:
         logger.error(f"插入种子数据失败: {e}")
         raise

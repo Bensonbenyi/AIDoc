@@ -290,6 +290,117 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 8. **更新 block**: PATCH /api/blocks/{id}
 9. **删除 block**: DELETE /api/blocks/{id}
 
+## 阶段 3：前端与后端对接（替换 Mock 数据） ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 3.1：创建前端 API 封装层与 block_type 映射 ✅
+
+**修改的文件**:
+- `frontend/src/lib/blockTypeMapping.ts` - 前后端 block_type 映射（新建）
+- `frontend/src/lib/api.ts` - API 请求封装（重写）
+
+**完成内容**:
+- 创建了 block_type 映射文件：h1↔heading_1, text↔paragraph, bullet↔bullet_list 等
+- api.ts 添加了 snake_case ↔ camelCase 自动转换
+- api.ts 添加了 block_type 自动转换（发送时前端→后端，接收时后端→前端）
+- API 类型接口改为 camelCase（与前端类型一致）
+
+### 步骤 3.2：替换 documentStore 中的 Mock 数据 ✅
+
+**修改的文件**:
+- `frontend/src/stores/documentStore.ts` - 文档数据 store（重写）
+- `frontend/src/components/editor/DocumentEditor.tsx` - 编辑器组件（更新）
+- `frontend/src/components/editor/SlashCommandMenu.tsx` - 斜杠命令菜单（更新）
+
+**完成内容**:
+- `loadDocument` 改为异步，调用 `documentsAPI.getDetail()`
+- 新增 `loadTree` 函数，调用 `documentsAPI.getTree()`
+- `updateBlock` 改为乐观更新 + 自动保存
+- `insertBlock` / `addBlockFromSlash` 改为异步，调用 `documentsAPI.createBlock()`
+- `removeBlock` 改为乐观更新 + 异步删除
+- `moveBlock` / `duplicateBlock` 改为异步 + 批量保存
+- `addNewRootDoc` / `addChildNode` 改为异步，调用 `documentsAPI.create()`
+- 新增 `saveDocument` 函数（批量保存 blocks）
+- 新增自动保存机制（debounce 2 秒）
+- 新增 `isSaving`, `lastSavedAt`, `isLoading`, `isTreeLoading` 状态
+- DocumentEditor 添加加载状态和保存状态指示器
+- SlashCommandMenu 和 DocumentEditor 适配 async addBlockFromSlash
+
+### 步骤 3.3：修改文档树组件对接后端 ✅
+
+**修改的文件**:
+- `frontend/src/components/sidebar/DocumentTree.tsx` - 文档树组件（重写）
+
+**完成内容**:
+- 组件挂载时调用 `loadTree` 加载文档树
+- 点击文档节点使用 `router.push` 跳转到 `/documents/[docId]`
+- 新建文档时调用后端 API 创建后路由跳转
+- 添加加载状态（Loader2 动画）和空状态展示
+
+### 步骤 3.4：创建文档页面路由 ✅
+
+**修改的文件**:
+- `frontend/src/app/documents/[docId]/page.tsx` - 动态路由页面（新建）
+- `frontend/src/app/page.tsx` - 首页（重写）
+
+**完成内容**:
+- 创建 `/documents/[docId]` 动态路由页面
+- 使用 Next.js 15+ 的 `use(params)` 访问路由参数
+- 页面加载时同步 URL docId 到 store
+- 首页加载文档树后自动跳转到第一个文档
+- 首页显示连接错误状态和重试按钮
+
+### 步骤 3.5：实现前端路由与 store 同步 ✅
+
+**完成内容**:
+- URL → Store：DocumentPage 通过 useEffect 同步 URL docId 到 activeDocId
+- Store → URL：DocumentTree 在创建文档后通过 router.push 更新 URL
+- 浏览器前进/后退：URL 变化时 DocumentPage 自动同步 store
+- 文档不存在时显示加载失败状态
+
+## 如何测试阶段 3
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **首页自动跳转**: 应自动跳转到第一个文档 `/documents/{id}`
+2. **文档树加载**: 左侧文档树从后端加载，显示种子数据中的文档
+3. **文档内容加载**: 编辑器从后端加载文档 blocks
+4. **新建文档**: 点击"新建文档"按钮，创建后自动跳转到新文档
+5. **新建子文档**: hover 文档节点，点击"+"按钮创建子文档
+6. **编辑 blocks**: 编辑 block 内容，2 秒后自动保存到后端
+7. **斜杠命令**: 输入 `/` 插入新 block，保存到后端
+8. **拖拽排序**: 拖拽 block 重新排序，自动保存
+9. **删除 block**: 删除 block，同步到后端
+10. **浏览器前进后退**: 前进/后退按钮正确切换文档
+11. **URL 直接访问**: 直接访问 `/documents/{id}` 能正确加载文档
+12. **保存状态**: 右下角显示"保存中..."和"已保存"状态
+
+### 4. 检查后端数据
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- GET /api/documents/tree — 文档树正确
+- GET /api/documents/{id} — 文档详情包含 blocks
+- blocks 的 block_type 使用后端格式（heading_1, paragraph 等）
+
 ## 下一步
 
-阶段 2 已完成，可以开始阶段 3：前端与后端对接（替换 Mock 数据）。
+阶段 3 已完成，可以开始阶段 4（白板功能对接）或阶段 5（代码执行功能）。

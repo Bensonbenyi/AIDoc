@@ -1,7 +1,14 @@
 import { create } from 'zustand';
 import { DocumentTreeNode } from '@/types/document';
 import { DocumentBlock } from '@/types/block';
-import { MOCK_TREE, createMockBlocks, MOCK_DOC_META } from '@/lib/mock-data';
+import {
+  documentsAPI,
+  blocksAPI,
+  type BlockCreate,
+  type DocumentDetail,
+  type BlockResponse,
+} from '@/lib/api';
+import { toBackendBlockType } from '@/lib/blockTypeMapping';
 
 interface DocumentState {
   tree: DocumentTreeNode[];
@@ -11,29 +18,33 @@ interface DocumentState {
   currentDocId: string | null;
   currentDocMeta: { icon: string; title: string; desc: string } | null;
 
-  loadDocument: (docId: string) => void;
+  // 保存状态
+  isSaving: boolean;
+  lastSavedAt: string | null;
+  isLoading: boolean;
+  isTreeLoading: boolean;
+
+  loadDocument: (docId: string) => Promise<void>;
+  loadTree: () => Promise<void>;
   toggleTreeNode: (nodeId: string) => void;
-  addChildNode: (parentId: string) => void;
+  addChildNode: (parentId: string) => Promise<string | null>;
   updateBlock: (blockId: string, content: Record<string, unknown>) => void;
   toggleTodoItem: (blockId: string, itemIndex: number) => void;
-  insertBlock: (afterBlockId: string, blockType: string) => void;
-  removeBlock: (blockId: string) => void;
+  insertBlock: (afterBlockId: string, blockType: string) => Promise<void>;
+  removeBlock: (blockId: string) => Promise<void>;
   undoLastChange: (docId?: string | null) => void;
-  duplicateBlock: (blockId: string) => void;
+  duplicateBlock: (blockId: string) => Promise<void>;
   moveBlock: (blockId: string, targetIndex: number) => void;
-  addNewRootDoc: () => void;
+  addNewRootDoc: () => Promise<string | null>;
   addBlockFromSlash: (
     docId: string,
     blockType: string,
     content?: Record<string, unknown>,
     targetIndex?: number
-  ) => string;
-  replaceBlockFromSlash: (blockId: string, blockType: string, content?: Record<string, unknown>) => string;
-  addDocLinkBlock: (targetNode: DocumentTreeNode, docId: string, targetIndex?: number) => void;
-}
-
-function uid(): string {
-  return Math.random().toString(36).slice(2, 10);
+  ) => Promise<string>;
+  replaceBlockFromSlash: (blockId: string, blockType: string, content?: Record<string, unknown>) => Promise<string>;
+  addDocLinkBlock: (targetNode: DocumentTreeNode, docId: string, targetIndex?: number) => Promise<void>;
+  saveDocument: () => Promise<void>;
 }
 
 function now(): string {
@@ -87,6 +98,32 @@ function defaultBlockContent(blockType: string): Record<string, unknown> {
   }
 }
 
+/** 将 API 返回的 BlockResponse 转为前端 DocumentBlock */
+function toDocumentBlock(b: BlockResponse): DocumentBlock {
+  return {
+    id: b.id,
+    documentId: b.documentId,
+    parentBlockId: b.parentBlockId || undefined,
+    blockType: b.blockType as DocumentBlock['blockType'],
+    content: b.content,
+    properties: b.properties || undefined,
+    sortOrder: b.sortOrder,
+    createdAt: b.createdAt,
+    updatedAt: b.updatedAt,
+  };
+}
+
+/** 将 API 文档树节点转为前端 DocumentTreeNode（添加 isOpen） */
+function toTreeNodes(nodes: { id: string; icon: string; title: string; children: unknown[] }[]): DocumentTreeNode[] {
+  return nodes.map((n) => ({
+    id: String(n.id),
+    icon: n.icon,
+    title: n.title,
+    children: toTreeNodes(n.children as { id: string; icon: string; title: string; children: unknown[] }[] || []),
+    isOpen: false,
+  }));
+}
+
 function toggleNodeInTree(nodes: DocumentTreeNode[], nodeId: string): DocumentTreeNode[] {
   return nodes.map((n) => {
     if (n.id === nodeId) return { ...n, isOpen: !n.isOpen };
@@ -95,23 +132,7 @@ function toggleNodeInTree(nodes: DocumentTreeNode[], nodeId: string): DocumentTr
   });
 }
 
-function addChildToTree(nodes: DocumentTreeNode[], parentId: string): DocumentTreeNode[] {
-  return nodes.map((n) => {
-    if (n.id === parentId) {
-      const newChild: DocumentTreeNode = {
-        id: 'new-' + Date.now(),
-        icon: '📄',
-        title: '新建文档',
-        children: [],
-      };
-      return { ...n, children: [...n.children, newChild], isOpen: true };
-    }
-    if (n.children.length > 0) return { ...n, children: addChildToTree(n.children, parentId) };
-    return n;
-  });
-}
-
-function findDocPath(nodes: DocumentTreeNode[], docId: string, path: string[] = []): string[] | null {
+export function findDocPath(nodes: DocumentTreeNode[], docId: string, path: string[] = []): string[] | null {
   for (const n of nodes) {
     const currentPath = [...path, n.title];
     if (n.id === docId) return currentPath;
@@ -123,37 +144,84 @@ function findDocPath(nodes: DocumentTreeNode[], docId: string, path: string[] = 
   return null;
 }
 
-export { findDocPath };
+// 自动保存 debounce 定时器
+let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+const AUTO_SAVE_DELAY = 2000;
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
-  tree: MOCK_TREE,
+  tree: [],
   documentsById: {},
   historyByDocId: {},
   blocks: [],
   currentDocId: null,
   currentDocMeta: null,
+  isSaving: false,
+  lastSavedAt: null,
+  isLoading: false,
+  isTreeLoading: false,
 
-  loadDocument: (docId: string) => {
-    const existing = get().documentsById[docId];
-    const blocks = existing || createMockBlocks(docId);
-    const meta = MOCK_DOC_META[docId] || MOCK_DOC_META['design'];
-    set((s) => ({
-      blocks,
-      currentDocId: docId,
-      currentDocMeta: meta,
-      documentsById: existing ? s.documentsById : { ...s.documentsById, [docId]: blocks },
-    }));
+  loadTree: async () => {
+    set({ isTreeLoading: true });
+    try {
+      const treeData = await documentsAPI.getTree();
+      const tree = toTreeNodes(treeData);
+      // 保留已展开状态
+      const prevTree = get().tree;
+      const preserveOpenState = (nodes: DocumentTreeNode[], prev: DocumentTreeNode[]): DocumentTreeNode[] => {
+        return nodes.map((n) => {
+          const prevNode = prev.find((p) => p.id === n.id);
+          return {
+            ...n,
+            isOpen: prevNode?.isOpen ?? n.isOpen,
+            children: preserveOpenState(n.children, prevNode?.children || []),
+          };
+        });
+      };
+      set({ tree: preserveOpenState(tree, prevTree), isTreeLoading: false });
+    } catch (error) {
+      console.error('加载文档树失败:', error);
+      set({ isTreeLoading: false });
+    }
+  },
+
+  loadDocument: async (docId: string) => {
+    set({ isLoading: true });
+    try {
+      const detail: DocumentDetail = await documentsAPI.getDetail(docId);
+      const blocks = detail.blocks.map(toDocumentBlock);
+      set({
+        blocks,
+        currentDocId: docId,
+        currentDocMeta: { icon: detail.icon, title: detail.title, desc: detail.path },
+        documentsById: { ...get().documentsById, [docId]: blocks },
+        isLoading: false,
+      });
+    } catch (error) {
+      console.error('加载文档失败:', error);
+      set({ isLoading: false });
+    }
   },
 
   toggleTreeNode: (nodeId: string) => {
     set((s) => ({ tree: toggleNodeInTree(s.tree, nodeId) }));
   },
 
-  addChildNode: (parentId: string) => {
-    set((s) => ({ tree: addChildToTree(s.tree, parentId) }));
+  addChildNode: async (parentId: string) => {
+    try {
+      const doc = await documentsAPI.create({ title: '新建文档', parentId });
+      const newDocId = String(doc.id);
+      await get().loadTree();
+      // 展开父节点
+      set((s) => ({ tree: toggleNodeInTree(s.tree, parentId) }));
+      return newDocId;
+    } catch (error) {
+      console.error('创建子文档失败:', error);
+      return null;
+    }
   },
 
   updateBlock: (blockId, content) => {
+    // 乐观更新本地状态
     set((s) => ({
       blocks: s.blocks.map((b) => (b.id === blockId ? { ...b, content, updatedAt: now() } : b)),
       documentsById: s.currentDocId
@@ -165,6 +233,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           }
         : s.documentsById,
     }));
+    // 触发自动保存
+    scheduleAutoSave(get);
   },
 
   toggleTodoItem: (blockId, itemIndex) => {
@@ -180,49 +250,62 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         documentsById: s.currentDocId ? { ...s.documentsById, [s.currentDocId]: blocks } : s.documentsById,
       };
     });
+    scheduleAutoSave(get);
   },
 
-  insertBlock: (afterBlockId, blockType) => {
-    const { blocks } = get();
+  insertBlock: async (afterBlockId, blockType) => {
+    const { blocks, currentDocId } = get();
+    if (!currentDocId) return;
     const idx = blocks.findIndex((b) => b.id === afterBlockId);
     if (idx === -1) return;
-    const newBlock: DocumentBlock = {
-      id: uid(),
-      documentId: blocks[0]?.documentId || '',
-      blockType: blockType as DocumentBlock['blockType'],
-      content: defaultBlockContent(blockType),
-      sortOrder: idx + 1,
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    const newBlocks = [...blocks];
-    newBlocks.splice(idx + 1, 0, newBlock);
+
+    const sortOrder = idx + 1;
+    try {
+      const created = await documentsAPI.createBlock(currentDocId, {
+        blockType: toBackendBlockType(blockType),
+        content: defaultBlockContent(blockType),
+        sortOrder,
+      });
+      const newBlock = toDocumentBlock(created);
+      const newBlocks = [...blocks];
+      newBlocks.splice(idx + 1, 0, newBlock);
+      set((s) => ({
+        blocks: newBlocks,
+        documentsById: { ...s.documentsById, [currentDocId]: newBlocks },
+        historyByDocId: {
+          ...s.historyByDocId,
+          [currentDocId]: [...(s.historyByDocId[currentDocId] || []), cloneBlocks(blocks)].slice(-50),
+        },
+      }));
+    } catch (error) {
+      console.error('创建 block 失败:', error);
+    }
+  },
+
+  removeBlock: async (blockId) => {
+    const { blocks, currentDocId } = get();
+    // 乐观更新
+    const newBlocks = blocks.filter((b) => b.id !== blockId);
     set((s) => ({
       blocks: newBlocks,
-      documentsById: s.currentDocId ? { ...s.documentsById, [s.currentDocId]: newBlocks } : s.documentsById,
-      historyByDocId: s.currentDocId
+      documentsById: currentDocId ? { ...s.documentsById, [currentDocId]: newBlocks } : s.documentsById,
+      historyByDocId: currentDocId
         ? {
             ...s.historyByDocId,
-            [s.currentDocId]: [...(s.historyByDocId[s.currentDocId] || []), cloneBlocks(blocks)].slice(-50),
+            [currentDocId]: [...(s.historyByDocId[currentDocId] || []), cloneBlocks(blocks)].slice(-50),
           }
         : s.historyByDocId,
     }));
-  },
-
-  removeBlock: (blockId) => {
-    set((s) => {
-      const blocks = s.blocks.filter((b) => b.id !== blockId);
-      return {
+    try {
+      await blocksAPI.delete(blockId);
+    } catch (error) {
+      console.error('删除 block 失败:', error);
+      // 回滚
+      set((s) => ({
         blocks,
-        documentsById: s.currentDocId ? { ...s.documentsById, [s.currentDocId]: blocks } : s.documentsById,
-        historyByDocId: s.currentDocId
-          ? {
-              ...s.historyByDocId,
-              [s.currentDocId]: [...(s.historyByDocId[s.currentDocId] || []), cloneBlocks(s.blocks)].slice(-50),
-            }
-          : s.historyByDocId,
-      };
-    });
+        documentsById: currentDocId ? { ...s.documentsById, [currentDocId]: blocks } : s.documentsById,
+      }));
+    }
   },
 
   undoLastChange: (docId) => {
@@ -243,38 +326,42 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         historyByDocId: { ...s.historyByDocId, [targetDocId]: nextHistory },
       };
     });
+    // undo 后也需要保存到后端
+    scheduleAutoSave(get);
   },
 
-  duplicateBlock: (blockId) => {
-    set((s) => {
-      const idx = s.blocks.findIndex((b) => b.id === blockId);
-      if (idx === -1) return s;
+  duplicateBlock: async (blockId) => {
+    const { blocks, currentDocId } = get();
+    if (!currentDocId) return;
+    const idx = blocks.findIndex((b) => b.id === blockId);
+    if (idx === -1) return;
 
-      const source = s.blocks[idx];
-      const duplicated: DocumentBlock = {
-        ...source,
-        id: uid(),
+    const source = blocks[idx];
+    try {
+      const created = await documentsAPI.createBlock(currentDocId, {
+        blockType: toBackendBlockType(source.blockType),
         content: structuredClone(source.content),
+        properties: source.properties,
         sortOrder: idx + 1,
-        createdAt: now(),
-        updatedAt: now(),
-      };
+      });
+      const duplicated = toDocumentBlock(created);
+      const newBlocks = [...blocks];
+      newBlocks.splice(idx + 1, 0, duplicated);
+      const orderedBlocks = newBlocks.map((b, i) => ({ ...b, sortOrder: i }));
 
-      const blocks = [...s.blocks];
-      blocks.splice(idx + 1, 0, duplicated);
-      const orderedBlocks = blocks.map((b, i) => ({ ...b, sortOrder: i }));
-
-      return {
+      set((s) => ({
         blocks: orderedBlocks,
-        documentsById: s.currentDocId ? { ...s.documentsById, [s.currentDocId]: orderedBlocks } : s.documentsById,
-        historyByDocId: s.currentDocId
-          ? {
-              ...s.historyByDocId,
-              [s.currentDocId]: [...(s.historyByDocId[s.currentDocId] || []), cloneBlocks(s.blocks)].slice(-50),
-            }
-          : s.historyByDocId,
-      };
-    });
+        documentsById: { ...s.documentsById, [currentDocId]: orderedBlocks },
+        historyByDocId: {
+          ...s.historyByDocId,
+          [currentDocId]: [...(s.historyByDocId[currentDocId] || []), cloneBlocks(blocks)].slice(-50),
+        },
+      }));
+      // 批量保存排序
+      await get().saveDocument();
+    } catch (error) {
+      console.error('复制 block 失败:', error);
+    }
   },
 
   moveBlock: (blockId, targetIndex) => {
@@ -298,100 +385,134 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           : s.historyByDocId,
       };
     });
+    scheduleAutoSave(get);
   },
 
-  addNewRootDoc: () => {
-    const newNode: DocumentTreeNode = {
-      id: 'new-' + Date.now(),
-      icon: '📄',
-      title: '新建文档',
-      children: [],
-    };
-    set((s) => ({ tree: [...s.tree, newNode] }));
+  addNewRootDoc: async () => {
+    try {
+      const doc = await documentsAPI.create({ title: '新建文档' });
+      const newDocId = String(doc.id);
+      await get().loadTree();
+      return newDocId;
+    } catch (error) {
+      console.error('创建文档失败:', error);
+      return null;
+    }
   },
 
-  addBlockFromSlash: (docId, blockType, content, targetIndex) => {
+  addBlockFromSlash: async (docId, blockType, content, targetIndex) => {
     const { blocks } = get();
-    const newBlock: DocumentBlock = {
-      id: uid(),
-      documentId: docId,
-      blockType: blockType as DocumentBlock['blockType'],
-      content: content || defaultBlockContent(blockType),
-      sortOrder: blocks.length,
-      createdAt: now(),
-      updatedAt: now(),
-    };
     const insertAt =
       typeof targetIndex === 'number' && targetIndex >= 0 ? Math.min(targetIndex, blocks.length) : blocks.length;
-    const nextBlocks = [...blocks];
-    nextBlocks.splice(insertAt, 0, newBlock);
-    const orderedBlocks = nextBlocks.map((b, i) => ({ ...b, sortOrder: i }));
-    set((s) => ({
-      blocks: orderedBlocks,
-      currentDocId: docId,
-      documentsById: { ...s.documentsById, [docId]: orderedBlocks },
-      historyByDocId: {
-        ...s.historyByDocId,
-        [docId]: [...(s.historyByDocId[docId] || []), cloneBlocks(blocks)].slice(-50),
-      },
-    }));
-    return newBlock.id;
+
+    try {
+      const created = await documentsAPI.createBlock(docId, {
+        blockType: toBackendBlockType(blockType),
+        content: content || defaultBlockContent(blockType),
+        sortOrder: insertAt,
+      });
+      const newBlock = toDocumentBlock(created);
+      const nextBlocks = [...blocks];
+      nextBlocks.splice(insertAt, 0, newBlock);
+      const orderedBlocks = nextBlocks.map((b, i) => ({ ...b, sortOrder: i }));
+
+      set((s) => ({
+        blocks: orderedBlocks,
+        currentDocId: docId,
+        documentsById: { ...s.documentsById, [docId]: orderedBlocks },
+        historyByDocId: {
+          ...s.historyByDocId,
+          [docId]: [...(s.historyByDocId[docId] || []), cloneBlocks(blocks)].slice(-50),
+        },
+      }));
+      return newBlock.id;
+    } catch (error) {
+      console.error('创建 block 失败:', error);
+      return '';
+    }
   },
 
-  replaceBlockFromSlash: (blockId, blockType, content) => {
-    set((s) => {
-      const blocks = s.blocks.map((b) =>
-        b.id === blockId
-          ? {
-              ...b,
-              blockType: blockType as DocumentBlock['blockType'],
-              content: content || defaultBlockContent(blockType),
-              updatedAt: now(),
-            }
-          : b
-      );
+  replaceBlockFromSlash: async (blockId, blockType, content) => {
+    const { blocks, currentDocId } = get();
+    const target = blocks.find((b) => b.id === blockId);
+    if (!target || !currentDocId) return blockId;
 
-      return {
-        blocks,
-        documentsById: s.currentDocId ? { ...s.documentsById, [s.currentDocId]: blocks } : s.documentsById,
-        historyByDocId: s.currentDocId
-          ? {
-              ...s.historyByDocId,
-              [s.currentDocId]: [...(s.historyByDocId[s.currentDocId] || []), cloneBlocks(s.blocks)].slice(-50),
-            }
-          : s.historyByDocId,
-      };
-    });
+    // 乐观更新
+    const newContent = content || defaultBlockContent(blockType);
+    set((s) => ({
+      blocks: s.blocks.map((b) =>
+        b.id === blockId
+          ? { ...b, blockType: blockType as DocumentBlock['blockType'], content: newContent, updatedAt: now() }
+          : b
+      ),
+    }));
+
+    try {
+      await blocksAPI.update(blockId, { content: newContent });
+    } catch (error) {
+      console.error('更新 block 失败:', error);
+    }
     return blockId;
   },
 
-  addDocLinkBlock: (targetNode, docId, targetIndex) => {
+  addDocLinkBlock: async (targetNode, docId, targetIndex) => {
     const { blocks } = get();
-    const newBlock: DocumentBlock = {
-      id: uid(),
-      documentId: docId,
-      blockType: 'doclink',
-      content: {
-        targetDocId: targetNode.id,
-        icon: targetNode.icon,
-        title: targetNode.title,
-      },
-      sortOrder: blocks.length,
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    const nextBlocks = [...blocks];
     const insertAt =
-      typeof targetIndex === 'number' && targetIndex >= 0 ? Math.min(targetIndex, nextBlocks.length) : nextBlocks.length;
-    nextBlocks.splice(insertAt, 0, newBlock);
-    const orderedBlocks = nextBlocks.map((b, i) => ({ ...b, sortOrder: i }));
-    set((s) => ({
-      blocks: orderedBlocks,
-      documentsById: { ...s.documentsById, [docId]: orderedBlocks },
-      historyByDocId: {
-        ...s.historyByDocId,
-        [docId]: [...(s.historyByDocId[docId] || []), cloneBlocks(blocks)].slice(-50),
-      },
-    }));
+      typeof targetIndex === 'number' && targetIndex >= 0 ? Math.min(targetIndex, blocks.length) : blocks.length;
+
+    try {
+      const created = await documentsAPI.createBlock(docId, {
+        blockType: toBackendBlockType('doclink'),
+        content: {
+          targetDocId: targetNode.id,
+          icon: targetNode.icon,
+          title: targetNode.title,
+        },
+        sortOrder: insertAt,
+      });
+      const newBlock = toDocumentBlock(created);
+      const nextBlocks = [...blocks];
+      nextBlocks.splice(insertAt, 0, newBlock);
+      const orderedBlocks = nextBlocks.map((b, i) => ({ ...b, sortOrder: i }));
+
+      set((s) => ({
+        blocks: orderedBlocks,
+        documentsById: { ...s.documentsById, [docId]: orderedBlocks },
+        historyByDocId: {
+          ...s.historyByDocId,
+          [docId]: [...(s.historyByDocId[docId] || []), cloneBlocks(blocks)].slice(-50),
+        },
+      }));
+    } catch (error) {
+      console.error('创建文档链接 block 失败:', error);
+    }
+  },
+
+  saveDocument: async () => {
+    const { currentDocId, blocks } = get();
+    if (!currentDocId) return;
+
+    set({ isSaving: true });
+    try {
+      const blockCreates: BlockCreate[] = blocks.map((b, i) => ({
+        blockType: toBackendBlockType(b.blockType),
+        content: b.content,
+        properties: b.properties,
+        sortOrder: i,
+      }));
+      await documentsAPI.batchSaveBlocks(currentDocId, { blocks: blockCreates });
+      set({ isSaving: false, lastSavedAt: now() });
+    } catch (error) {
+      console.error('保存文档失败:', error);
+      set({ isSaving: false });
+    }
   },
 }));
+
+/** 防抖自动保存 */
+function scheduleAutoSave(get: () => DocumentState) {
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  autoSaveTimer = setTimeout(() => {
+    get().saveDocument();
+  }, AUTO_SAVE_DELAY);
+}

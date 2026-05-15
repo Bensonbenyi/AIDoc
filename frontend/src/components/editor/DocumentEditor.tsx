@@ -2,9 +2,9 @@
 
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { Loader2 } from 'lucide-react';
 import { useDocumentStore } from '@/stores/documentStore';
 import { useAppStore } from '@/stores/appStore';
-import { DOC_HEADER_META } from '@/lib/mock-data';
 import { SortableBlock } from '@/components/dnd/SortableBlock';
 import { SLASH_INSERTED_EVENT } from '@/lib/slash-command';
 import {
@@ -53,12 +53,12 @@ function BaseTextLine({ insertIndex }: BaseTextLineProps) {
     });
   }, [activeDocId, insertIndex, lineId, openSlashMenu]);
 
-  const commitText = useCallback(() => {
+  const commitText = useCallback(async () => {
     const element = lineRef.current;
     const text = element ? getEditorText(element) : '';
     if (!element || !text.trim()) return;
 
-    const nextBlockId = addBlockFromSlash(activeDocId, 'text', { text }, insertIndex);
+    const nextBlockId = await addBlockFromSlash(activeDocId, 'text', { text }, insertIndex);
     element.textContent = '';
     setHasText(false);
     return nextBlockId;
@@ -100,10 +100,9 @@ function BaseTextLine({ insertIndex }: BaseTextLineProps) {
         e.preventDefault();
         if (slashMenuOpen && slashMenuContext?.sourceLineId === lineId) return;
 
-        const nextBlockId = commitText();
-        if (nextBlockId) {
+        commitText().then(() => {
           window.requestAnimationFrame(() => focusBaseTextLine(insertIndex + 1));
-        }
+        });
         return;
       }
 
@@ -193,7 +192,7 @@ function BaseTextLine({ insertIndex }: BaseTextLineProps) {
 
 export function DocumentEditor() {
   const activeDocId = useAppStore((s) => s.activeDocId);
-  const { blocks, loadDocument, currentDocMeta } = useDocumentStore();
+  const { blocks, loadDocument, currentDocMeta, isLoading, isSaving, lastSavedAt } = useDocumentStore();
   const undoLastChange = useDocumentStore((s) => s.undoLastChange);
   const canUndo = useDocumentStore((s) => (s.historyByDocId[activeDocId]?.length || 0) > 0);
 
@@ -216,31 +215,55 @@ export function DocumentEditor() {
     return () => window.removeEventListener('keydown', handleUndo, { capture: true });
   }, [activeDocId, canUndo, undoLastChange]);
 
-  const meta = currentDocMeta || DOC_HEADER_META['design'];
+  const meta = currentDocMeta || { icon: '📄', title: '加载中...', desc: '' };
 
   return (
     <div className="max-w-[720px] mx-auto px-4 pt-8 pb-40">
-      <div className="mb-8">
-        <div className="mb-2 flex items-center gap-3">
-          <span className="text-4xl">{meta.icon}</span>
-          <h1 className="text-3xl font-bold outline-none" contentEditable suppressContentEditableWarning>
-            {meta.title}
-          </h1>
-        </div>
-        <p className="text-sm text-muted-foreground">{meta.desc}</p>
+      {/* 保存状态指示 */}
+      <div className="fixed bottom-4 right-4 z-20">
+        {isSaving && (
+          <div className="flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs text-muted-foreground shadow-sm border border-border backdrop-blur-sm">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            <span>保存中...</span>
+          </div>
+        )}
+        {!isSaving && lastSavedAt && (
+          <div className="rounded-full bg-white/90 px-3 py-1.5 text-xs text-muted-foreground/60 shadow-sm border border-border/50 backdrop-blur-sm">
+            已保存
+          </div>
+        )}
       </div>
 
-      <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-        <div>
-          <BaseTextLine insertIndex={0} />
-          {blocks.map((block, index) => (
-            <Fragment key={block.id}>
-              <SortableBlock block={block} />
-              <BaseTextLine insertIndex={index + 1} />
-            </Fragment>
-          ))}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+          <span>加载文档中...</span>
         </div>
-      </SortableContext>
+      ) : (
+        <>
+          <div className="mb-8">
+            <div className="mb-2 flex items-center gap-3">
+              <span className="text-4xl">{meta.icon}</span>
+              <h1 className="text-3xl font-bold outline-none" contentEditable suppressContentEditableWarning>
+                {meta.title}
+              </h1>
+            </div>
+            <p className="text-sm text-muted-foreground">{meta.desc}</p>
+          </div>
+
+          <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+            <div>
+              <BaseTextLine insertIndex={0} />
+              {blocks.map((block, index) => (
+                <Fragment key={block.id}>
+                  <SortableBlock block={block} />
+                  <BaseTextLine insertIndex={index + 1} />
+                </Fragment>
+              ))}
+            </div>
+          </SortableContext>
+        </>
+      )}
     </div>
   );
 }

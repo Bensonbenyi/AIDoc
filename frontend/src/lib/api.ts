@@ -2,7 +2,10 @@
  * API 请求封装模块
  *
  * 统一处理前端与后端的 HTTP 请求
+ * 自动处理 snake_case ↔ camelCase 转换和 block_type 映射
  */
+
+import { toBackendBlockType, toFrontendBlockType } from './blockTypeMapping';
 
 // 基础 URL 从环境变量读取
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -21,9 +24,84 @@ export class ApiError extends Error {
   }
 }
 
-/**
- * 基础请求函数
- */
+// ==============================
+// snake_case ↔ camelCase 转换
+// ==============================
+
+function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+}
+
+function camelToSnake(str: string): string {
+  return str.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+}
+
+function convertKeys(obj: unknown, converter: (key: string) => string): unknown {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => convertKeys(item, converter));
+  }
+  if (obj !== null && typeof obj === 'object' && !(obj instanceof Date)) {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      result[converter(key)] = convertKeys(value, converter);
+    }
+    return result;
+  }
+  return obj;
+}
+
+/** 将后端响应的 snake_case keys 转为 camelCase */
+function toCamelCase(obj: unknown): unknown {
+  return convertKeys(obj, snakeToCamel);
+}
+
+/** 将前端请求的 camelCase keys 转为 snake_case */
+function toSnakeCase(obj: unknown): unknown {
+  return convertKeys(obj, camelToSnake);
+}
+
+// ==============================
+// block_type 转换（在 key 转换之后执行）
+// ==============================
+
+function convertBlockTypeInResponse(data: unknown): unknown {
+  if (Array.isArray(data)) {
+    return data.map(convertBlockTypeInResponse);
+  }
+  if (data !== null && typeof data === 'object') {
+    const obj = { ...(data as Record<string, unknown>) };
+    if (typeof obj.blockType === 'string') {
+      obj.blockType = toFrontendBlockType(obj.blockType);
+    }
+    if (Array.isArray(obj.blocks)) {
+      obj.blocks = obj.blocks.map(convertBlockTypeInResponse);
+    }
+    if (Array.isArray(obj.children)) {
+      obj.children = obj.children.map(convertBlockTypeInResponse);
+    }
+    return obj;
+  }
+  return data;
+}
+
+function convertBlockTypeInRequest(data: unknown): unknown {
+  if (data !== null && typeof data === 'object' && !Array.isArray(data)) {
+    const obj = { ...(data as Record<string, unknown>) };
+    if (typeof obj.block_type === 'string') {
+      obj.block_type = toBackendBlockType(obj.block_type);
+    }
+    if (Array.isArray(obj.blocks)) {
+      obj.blocks = obj.blocks.map(convertBlockTypeInRequest);
+    }
+    return obj;
+  }
+  return data;
+}
+
+// ==============================
+// 基础请求函数
+// ==============================
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -65,9 +143,11 @@ async function request<T>(
       return {} as T;
     }
 
-    // 解析 JSON 响应
-    const data = await response.json();
-    return data as T;
+    // 解析 JSON 响应，自动转换 snake_case → camelCase 和 block_type
+    const rawData = await response.json();
+    const camelData = toCamelCase(rawData);
+    const finalData = convertBlockTypeInResponse(camelData);
+    return finalData as T;
   } catch (error) {
     // 如果是 ApiError，直接抛出
     if (error instanceof ApiError) {
@@ -90,32 +170,35 @@ export async function get<T>(endpoint: string): Promise<T> {
 }
 
 /**
- * POST 请求
+ * POST 请求（自动转换请求体 camelCase → snake_case 和 block_type）
  */
 export async function post<T>(endpoint: string, data?: unknown): Promise<T> {
+  const converted = data ? convertBlockTypeInRequest(toSnakeCase(data)) : undefined;
   return request<T>(endpoint, {
     method: "POST",
-    body: data ? JSON.stringify(data) : undefined,
+    body: converted ? JSON.stringify(converted) : undefined,
   });
 }
 
 /**
- * PUT 请求
+ * PUT 请求（自动转换请求体）
  */
 export async function put<T>(endpoint: string, data?: unknown): Promise<T> {
+  const converted = data ? convertBlockTypeInRequest(toSnakeCase(data)) : undefined;
   return request<T>(endpoint, {
     method: "PUT",
-    body: data ? JSON.stringify(data) : undefined,
+    body: converted ? JSON.stringify(converted) : undefined,
   });
 }
 
 /**
- * PATCH 请求
+ * PATCH 请求（自动转换请求体）
  */
 export async function patch<T>(endpoint: string, data?: unknown): Promise<T> {
+  const converted = data ? convertBlockTypeInRequest(toSnakeCase(data)) : undefined;
   return request<T>(endpoint, {
     method: "PATCH",
-    body: data ? JSON.stringify(data) : undefined,
+    body: converted ? JSON.stringify(converted) : undefined,
   });
 }
 
@@ -127,32 +210,32 @@ export async function del<T>(endpoint: string): Promise<T> {
 }
 
 // ==============================
-// 文档相关 API
+// API 响应类型（camelCase，与前端类型一致）
 // ==============================
 
 export interface DocumentCreate {
   title: string;
-  parent_id?: string | null;
+  parentId?: string | null;
   icon?: string;
 }
 
 export interface DocumentUpdate {
   title?: string;
   icon?: string;
-  cover_url?: string;
+  coverUrl?: string;
 }
 
 export interface DocumentResponse {
   id: string;
-  parent_id: string | null;
+  parentId: string | null;
   title: string;
   icon: string;
-  cover_url: string | null;
-  sort_order: number;
+  coverUrl: string | null;
+  sortOrder: number;
   path: string;
-  is_deleted: boolean;
-  created_at: string;
-  updated_at: string;
+  isDeleted: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface DocumentTreeNode {
@@ -162,15 +245,20 @@ export interface DocumentTreeNode {
   children: DocumentTreeNode[];
 }
 
-export interface DocumentDetail extends DocumentResponse {
+export interface DocumentDetail {
+  id: string;
+  title: string;
+  icon: string;
+  coverUrl: string | null;
+  path: string;
   blocks: BlockResponse[];
 }
 
 export interface BlockCreate {
-  block_type: string;
+  blockType: string;
   content: Record<string, unknown>;
   properties?: Record<string, unknown>;
-  sort_order: number;
+  sortOrder: number;
 }
 
 export interface BlockUpdate {
@@ -180,14 +268,14 @@ export interface BlockUpdate {
 
 export interface BlockResponse {
   id: string;
-  document_id: string;
-  parent_block_id: string | null;
-  block_type: string;
+  documentId: string;
+  parentBlockId: string | null;
+  blockType: string;
   content: Record<string, unknown>;
   properties: Record<string, unknown> | null;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface BlocksBatchSave {
@@ -196,53 +284,32 @@ export interface BlocksBatchSave {
 
 export interface BlocksBatchResponse {
   success: boolean;
-  updated_count: number;
+  updatedCount: number;
 }
 
 /**
  * 文档 API
  */
 export const documentsAPI = {
-  /**
-   * 创建文档
-   */
   create: (data: DocumentCreate): Promise<DocumentResponse> =>
     post("/api/documents", data),
 
-  /**
-   * 获取文档树
-   */
   getTree: (): Promise<DocumentTreeNode[]> => get("/api/documents/tree"),
 
-  /**
-   * 获取文档详情
-   */
   getDetail: (docId: string): Promise<DocumentDetail> =>
     get(`/api/documents/${docId}`),
 
-  /**
-   * 更新文档
-   */
   update: (docId: string, data: DocumentUpdate): Promise<DocumentResponse> =>
     patch(`/api/documents/${docId}`, data),
 
-  /**
-   * 删除文档
-   */
   delete: (docId: string): Promise<void> => del(`/api/documents/${docId}`),
 
-  /**
-   * 批量保存 blocks
-   */
   batchSaveBlocks: (
     docId: string,
     data: BlocksBatchSave
   ): Promise<BlocksBatchResponse> =>
     put(`/api/documents/${docId}/blocks`, data),
 
-  /**
-   * 创建单个 block
-   */
   createBlock: (docId: string, data: BlockCreate): Promise<BlockResponse> =>
     post(`/api/documents/${docId}/blocks`, data),
 };
@@ -251,14 +318,8 @@ export const documentsAPI = {
  * Block API
  */
 export const blocksAPI = {
-  /**
-   * 更新 block
-   */
   update: (blockId: string, data: BlockUpdate): Promise<BlockResponse> =>
     patch(`/api/blocks/${blockId}`, data),
 
-  /**
-   * 删除 block
-   */
   delete: (blockId: string): Promise<void> => del(`/api/blocks/${blockId}`),
 };
