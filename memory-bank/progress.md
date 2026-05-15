@@ -791,3 +791,133 @@ npm run dev
 ## 下一步
 
 阶段 6 已完成，可以开始阶段 7（AI 对话功能）。
+
+## 阶段 7：AI 对话功能 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 7.1：实现 AI Service 层 ✅
+
+**修改的文件**:
+- `backend/app/services/ai_service.py` - AI 服务核心模块（新建）
+
+**完成内容**:
+- 创建了 `AIService` 类，封装智谱 AI GLM-5.1 API 调用
+- `_call_llm` — 普通调用 LLM（OpenAI 兼容的 Chat Completions 接口）
+- `_stream_llm` — 流式调用 LLM（SSE 格式）
+- `_build_chat_messages` — 构造消息列表（system prompt + history + context + user message）
+- `_parse_ai_response` — 解析 LLM 返回的 JSON 格式响应
+- `chat` — 普通 AI 对话（保存用户消息和 AI 回答到数据库）
+- `stream_chat` — 流式 AI 对话（AsyncGenerator）
+- `create_session` / `get_session` / `get_messages` — 会话和消息管理
+- `get_sessions_by_document` — 获取指定文档的对话会话列表
+- 使用 `httpx.AsyncClient` 发送请求，支持超时处理
+- 全局单例 `ai_service` 供路由使用
+
+### 步骤 7.2：创建 Prompt 模板文件 ✅
+
+**修改的文件**:
+- `backend/app/prompts/document_qa_system.txt` - 文档问答 system prompt（新建）
+- `backend/app/prompts/general_chat_system.txt` - 普通对话 system prompt（新建）
+- `backend/app/prompts/document_summary_system.txt` - 文档摘要 system prompt（新建）
+- `backend/app/prompts/rewrite_system.txt` - 内容改写 system prompt（新建）
+- `backend/app/prompts/chart_generation_system.txt` - 图表生成建议 system prompt（新建）
+- `backend/app/prompts/code_explain_system.txt` - 代码解释 system prompt（新建）
+
+**完成内容**:
+- 文档问答 prompt：定义 AI 文档助手角色，要求基于文档内容回答，支持引用来源，JSON 输出格式
+- 普通对话 prompt：通用对话助手，支持各类问题
+- 文档摘要 prompt：提炼文档核心内容，提取关键要点
+- 内容改写 prompt：根据需求改写文本
+- 图表生成 prompt：分析数据特征，建议图表配置
+- 代码解释 prompt：清晰解释代码功能和逻辑
+
+### 步骤 7.3：实现 AI 路由 ✅
+
+**修改的文件**:
+- `backend/app/routers/ai.py` - AI 对话 API 路由（新建）
+- `backend/app/main.py` - 注册 AI 路由
+
+**完成内容**:
+- 会话管理接口：
+  - `POST /api/ai/sessions` — 创建对话会话
+  - `GET /api/ai/sessions/{session_id}` — 获取会话详情
+  - `GET /api/ai/sessions/{session_id}/messages` — 获取对话历史
+  - `GET /api/ai/documents/{document_id}/sessions` — 获取文档的对话会话列表
+- AI 对话接口：
+  - `POST /api/ai/chat` — 普通 AI 对话
+  - `POST /api/ai/chat/stream` — 流式 AI 对话（SSE）
+  - `POST /api/ai/document-qa` — 基于文档问答
+- 文档问答使用占位上下文构建（RAG 检索将在阶段 8 实现）
+- 在 `main.py` 中注册 AI 路由到 `/api/ai`
+
+### 步骤 7.4：前端 AI 侧边栏对接后端 ✅
+
+**修改的文件**:
+- `frontend/src/lib/api.ts` - 添加 AI API 函数
+- `frontend/src/stores/aiChatStore.ts` - 重写为对接真实 API
+- `frontend/src/components/sidebar/AIAssistantPanel.tsx` - 添加 scope 选择器
+
+**完成内容**:
+- `api.ts` 添加了 `aiAPI`：
+  - `createSession` / `getSession` / `getMessages` — 会话管理
+  - `getDocumentSessions` — 获取文档的会话列表
+  - `chat` — 普通对话
+  - `documentQA` — 文档问答（自动映射 scope 值）
+  - AI scope 映射：前端 `doc/tree/all` → 后端 `current_document/document_tree/all_workspace`
+- `aiChatStore.ts` 重写：
+  - `sendMessage` 改为异步，调用真实 API（根据 scope 决定调用 chat 或 document-qa）
+  - 添加 `sessionId` 管理
+  - 添加 `loadHistory` 函数加载对话历史
+  - 错误处理：API 调用失败时显示错误消息
+  - 引用映射：将后端 references 转换为前端 citation 格式
+- `AIAssistantPanel.tsx` 更新：
+  - 添加 `ScopeSelector` 组件（当前文档 / 文档树 / 全工作区）
+  - 发送消息时传递当前 `activeDocId`
+  - Scope 选择器支持下拉菜单，显示图标和说明
+
+## 如何测试阶段 7
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证 AI 对话功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **打开 AI 面板**: 点击右侧 AI Chat 按钮打开 AI 侧边栏
+2. **Scope 选择器**: 点击 header 中的 scope 选择器，切换"当前文档"/"文档树"/"全工作区"
+3. **普通对话**: 在"文档树"或"全工作区"模式下输入问题，AI 应回答
+4. **文档问答**: 在"当前文档"模式下输入问题，AI 基于文档内容回答
+5. **引用来源**: AI 回答中的引用来源应可点击，点击后跳转到对应 block
+6. **错误处理**: 如果 LLM API 未配置，应显示友好的错误提示
+7. **多轮对话**: 连续发送多条消息，验证对话历史正确维护
+
+### 4. 检查后端 API
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- `POST /api/ai/sessions` — 创建会话
+- `GET /api/ai/sessions/{session_id}/messages` — 获取消息历史
+- `POST /api/ai/chat` — 普通对话
+- `POST /api/ai/document-qa` — 文档问答
+- `POST /api/ai/chat/stream` — 流式对话
+- 数据库 `ai_chat_sessions` 和 `ai_messages` 表中应有对应记录
+
+### 5. 注意事项
+
+- 需要在 `.env` 中配置有效的 `LLM_API_KEY` 才能获得真实的 AI 回答
+- 未配置 API Key 时，调用 LLM 会失败，前端会显示错误提示
+- RAG 检索功能将在阶段 8 实现，当前文档问答使用简单的文档内容拼接作为上下文

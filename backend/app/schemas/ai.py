@@ -20,6 +20,7 @@ class AIDocumentQARequest(BaseModel):
     document_id: uuid.UUID = Field(..., description="文档 ID")
     question: str = Field(..., min_length=1, description="用户问题")
     scope: AIScope = Field(AIScope.CURRENT_DOCUMENT, description="检索范围")
+    session_id: uuid.UUID | None = Field(None, description="会话 ID，为空则创建新会话")
 
 
 class AIReference(BaseModel):
@@ -35,3 +36,4 @@ class AIResponse(BaseModel):
     answer: str
     references: list[AIReference] = []
     confidence: str | None = None
+    session_id: uuid.UUID | None = None

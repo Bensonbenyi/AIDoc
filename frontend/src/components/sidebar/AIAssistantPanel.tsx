@@ -4,8 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { useAIChatStore } from '@/stores/aiChatStore';
 import { useAppStore } from '@/stores/appStore';
-import { AIChatAttachment, AIMessage } from '@/types/ai';
-import { PanelRightClose, Send, X } from 'lucide-react';
+import { AIChatAttachment, AIMessage, AIScope } from '@/types/ai';
+import { PanelRightClose, Send, X, ChevronDown, FileText, TreePine, Globe } from 'lucide-react';
 
 function AttachmentChip({
   attachment,
@@ -109,6 +109,73 @@ function AIMessageView({ msg }: { msg: AIMessage }) {
   );
 }
 
+/** Scope 选择器组件 */
+function ScopeSelector({
+  scope,
+  onChange,
+}: {
+  scope: AIScope;
+  onChange: (scope: AIScope) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  const scopeOptions: { value: AIScope; label: string; icon: React.ReactNode; desc: string }[] = [
+    { value: 'doc', label: '当前文档', icon: <FileText className="w-3.5 h-3.5" />, desc: '仅搜索当前文档内容' },
+    { value: 'tree', label: '文档树', icon: <TreePine className="w-3.5 h-3.5" />, desc: '搜索当前文档及其子文档' },
+    { value: 'all', label: '全工作区', icon: <Globe className="w-3.5 h-3.5" />, desc: '搜索所有文档内容' },
+  ];
+
+  const current = scopeOptions.find((o) => o.value === scope) || scopeOptions[0];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
+      >
+        {current.icon}
+        <span>{current.label}</span>
+        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-border rounded-lg shadow-lg z-50 py-1">
+          {scopeOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange(opt.value);
+                setOpen(false);
+              }}
+              className={`w-full flex items-start gap-2 px-3 py-2 text-left hover:bg-muted transition-colors ${
+                scope === opt.value ? 'text-indigo-600 bg-indigo-50' : 'text-foreground'
+              }`}
+            >
+              <span className="mt-0.5">{opt.icon}</span>
+              <div>
+                <div className="text-xs font-medium">{opt.label}</div>
+                <div className="text-[10px] text-muted-foreground">{opt.desc}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function AIAssistantPanel() {
   const {
     messages,
@@ -116,8 +183,11 @@ export function AIAssistantPanel() {
     removePendingAttachment,
     sendMessage,
     isStreaming,
+    scope,
+    setScope,
   } = useAIChatStore();
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar);
+  const activeDocId = useAppStore((s) => s.activeDocId);
   const [input, setInput] = useState('');
   const msgsRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -137,7 +207,7 @@ export function AIAssistantPanel() {
   const handleSend = () => {
     const text = input.trim();
     if ((!text && pendingAttachments.length === 0) || isStreaming) return;
-    sendMessage(text, pendingAttachments);
+    sendMessage(text, pendingAttachments, activeDocId);
     setInput('');
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
@@ -171,6 +241,7 @@ export function AIAssistantPanel() {
       <div className="px-4 py-3 border-b border-border">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">AI Chat</span>
+          <ScopeSelector scope={scope} onChange={setScope} />
           <button
             type="button"
             onClick={toggleRightSidebar}

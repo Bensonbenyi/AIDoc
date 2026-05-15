@@ -445,3 +445,86 @@ export const whiteboardAPI = {
   get: (blockId: string): Promise<WhiteboardResponse> =>
     get(`/api/blocks/${blockId}/whiteboard`),
 };
+
+// ==============================
+// AI 对话 API
+// ==============================
+
+/** AI scope 映射：前端 → 后端 */
+const scopeToBackend: Record<string, string> = {
+  doc: 'current_document',
+  tree: 'document_tree',
+  all: 'all_workspace',
+};
+
+export interface AIChatResponse {
+  messageId: string;
+  answer: string;
+  references: AIReferenceData[];
+  confidence: string | null;
+  sessionId?: string;
+}
+
+export interface AIReferenceData {
+  docId: string;
+  blockId: string;
+  blockType: string;
+  contentPreview: string;
+  documentPath?: string;
+}
+
+export interface AISessionResponse {
+  id: string;
+  documentId: string | null;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AIMessageResponse {
+  id: string;
+  sessionId: string;
+  role: string;
+  content: string;
+  references: Record<string, unknown>[] | null;
+  createdAt: string;
+}
+
+/**
+ * AI 对话 API
+ */
+export const aiAPI = {
+  /** 创建对话会话 */
+  createSession: (documentId?: string, title?: string): Promise<AISessionResponse> => {
+    const params = new URLSearchParams();
+    if (documentId) params.set('document_id', documentId);
+    if (title) params.set('title', title);
+    const qs = params.toString();
+    return post(`/api/ai/sessions${qs ? '?' + qs : ''}`, undefined);
+  },
+
+  /** 获取会话详情 */
+  getSession: (sessionId: string): Promise<AISessionResponse> =>
+    get(`/api/ai/sessions/${sessionId}`),
+
+  /** 获取对话历史消息 */
+  getMessages: (sessionId: string, limit: number = 50): Promise<AIMessageResponse[]> =>
+    get(`/api/ai/sessions/${sessionId}/messages?limit=${limit}`),
+
+  /** 获取文档的对话会话列表 */
+  getDocumentSessions: (documentId: string): Promise<AISessionResponse[]> =>
+    get(`/api/ai/documents/${documentId}/sessions`),
+
+  /** 普通 AI 对话 */
+  chat: (sessionId: string | null, message: string): Promise<AIChatResponse> =>
+    post('/api/ai/chat', { sessionId, message }),
+
+  /** 基于文档问答 */
+  documentQA: (documentId: string, question: string, scope: string, sessionId?: string | null): Promise<AIChatResponse> =>
+    post('/api/ai/document-qa', {
+      documentId,
+      question,
+      scope: scopeToBackend[scope] || 'current_document',
+      sessionId: sessionId || undefined,
+    }),
+};
