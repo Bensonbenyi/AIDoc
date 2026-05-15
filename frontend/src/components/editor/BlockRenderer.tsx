@@ -15,6 +15,8 @@ import {
   WhiteboardBlock,
   Chart3DBlock,
   AIAnswerBlock,
+  AudioBlock,
+  VideoBlock,
 } from './blocks';
 
 interface Props {
@@ -58,6 +60,10 @@ export function BlockRenderer({ block }: Props) {
       return <Chart3DBlock block={block} onUpdate={handleUpdate} />;
     case 'ai-answer':
       return <AIAnswerBlock block={block} />;
+    case 'audio':
+      return <AudioBlock block={block} onUpdate={handleUpdate} />;
+    case 'video':
+      return <VideoBlock block={block} onUpdate={handleUpdate} />;
     default:
       return <TextBlock block={block} onUpdate={handleUpdate} />;
   }

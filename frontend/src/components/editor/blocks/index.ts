@@ -10,3 +10,5 @@ export { DocLinkBlock } from './DocLinkBlock';
 export { WhiteboardBlock } from './WhiteboardBlock';
 export { Chart3DBlock } from './Chart3DBlock';
 export { AIAnswerBlock } from './AIAnswerBlock';
+export { AudioBlock } from './AudioBlock';
+export { VideoBlock } from './VideoBlock';

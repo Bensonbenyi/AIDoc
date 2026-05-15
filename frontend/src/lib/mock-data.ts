@@ -56,6 +56,8 @@ export const SLASH_ITEMS: SlashMenuSection[] = [
       { id: 'chart3d', icon: '📊', name: '3D 图表', desc: '三维数据可视化' },
       { id: 'image', icon: '🖼️', name: '图片', desc: '插入图片' },
       { id: 'file', icon: '📎', name: '文件', desc: '附件文件' },
+      { id: 'audio', icon: '🎵', name: '音频', desc: '内联音频播放器' },
+      { id: 'video', icon: '🎬', name: '视频', desc: '内联视频播放器' },
       { id: 'doclink', icon: '🔗', name: '链接到文档', desc: '内部文档链接' },
       { id: 'ai-answer', icon: '✦', name: 'AI 回答块', desc: 'AI 生成的内容块' },
     ],

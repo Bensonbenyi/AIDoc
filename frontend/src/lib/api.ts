@@ -447,6 +447,94 @@ export const whiteboardAPI = {
 };
 
 // ==============================
+// 文件上传 API
+// ==============================
+
+export interface FileUploadResponse {
+  id: string;
+  fileName: string;
+  fileType: string;
+  fileUrl: string;
+  fileSize: number;
+  createdAt: string;
+}
+
+export interface FileUploadProgress {
+  loaded: number;
+  total: number;
+  percent: number;
+}
+
+/**
+ * 上传文件（支持进度回调）
+ */
+export function uploadFile(
+  file: File,
+  documentId: string,
+  blockId?: string,
+  onProgress?: (progress: FileUploadProgress) => void
+): Promise<FileUploadResponse> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('document_id', documentId);
+    if (blockId) formData.append('block_id', blockId);
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress({
+          loaded: e.loaded,
+          total: e.total,
+          percent: Math.round((e.loaded / e.total) * 100),
+        });
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const raw = JSON.parse(xhr.responseText);
+          const camel = toCamelCase(raw) as FileUploadResponse;
+          resolve(camel);
+        } catch {
+          reject(new ApiError('响应解析失败', xhr.status));
+        }
+      } else {
+        let errorData: unknown;
+        try {
+          errorData = JSON.parse(xhr.responseText);
+        } catch {
+          errorData = null;
+        }
+        reject(new ApiError(`上传失败: ${xhr.statusText}`, xhr.status, errorData));
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      reject(new ApiError('网络错误', 0));
+    });
+
+    xhr.addEventListener('abort', () => {
+      reject(new ApiError('上传已取消', 0));
+    });
+
+    xhr.open('POST', `${API_BASE_URL}/api/files/upload`);
+    xhr.send(formData);
+  });
+}
+
+export const filesAPI = {
+  upload: uploadFile,
+
+  /** 获取文件 URL */
+  getUrl: (fileId: string): string => `${API_BASE_URL}/api/files/${fileId}`,
+
+  /** 删除文件 */
+  delete: (fileId: string): Promise<void> => del(`/api/files/${fileId}`),
+};
+
+// ==============================
 // AI 对话 API
 // ==============================
 

@@ -14,6 +14,8 @@ export type BlockType =
   | 'chart3d'
   | 'image'
   | 'file'
+  | 'audio'
+  | 'video'
   | 'doclink'
   | 'ai-answer';
 
@@ -79,6 +81,21 @@ export interface Chart3DData {
   zLabel?: string;
   // 兼容旧格式
   bars?: { label: string; height: number }[];
+}
+
+export interface AudioContent {
+  fileId?: string;
+  fileName?: string;
+  fileUrl?: string;
+  duration?: number;
+}
+
+export interface VideoContent {
+  fileId?: string;
+  fileName?: string;
+  fileUrl?: string;
+  duration?: number;
+  posterUrl?: string;
 }
 
 export interface SlashMenuItem {

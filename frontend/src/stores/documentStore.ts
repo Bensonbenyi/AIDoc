@@ -90,6 +90,10 @@ function defaultBlockContent(blockType: string): Record<string, unknown> {
       return { text: 'AI 生成内容会显示在这里。' };
     case 'doclink':
       return { targetDocId: 'overview', icon: '📋', title: '项目总览' };
+    case 'audio':
+      return {};
+    case 'video':
+      return {};
     case 'image':
       return { text: '图片占位块' };
     case 'file':

@@ -1032,3 +1032,97 @@ npm run dev
 - 需要在 `.env` 中配置有效的 `LLM_API_KEY` 才能获得真实的 AI 回答
 - 拖拽功能依赖 dnd-kit，已在阶段 3 集成
 - RAG 相关代码已预建但当前不启用，仅作为未来升级储备
+
+## 阶段 9：文件存储与多媒体模块 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 9.0：实现音频/视频 Block 前端组件 ✅
+
+**修改的文件**:
+- `frontend/src/types/block.ts` - 添加 `audio` 和 `video` BlockType，添加 AudioContent 和 VideoContent 类型
+- `frontend/src/components/editor/blocks/AudioBlock.tsx` - 音频播放器组件（新建）
+- `frontend/src/components/editor/blocks/VideoBlock.tsx` - 视频播放器组件（新建）
+- `frontend/src/components/editor/blocks/index.ts` - 导出 AudioBlock 和 VideoBlock
+- `frontend/src/components/editor/BlockRenderer.tsx` - 添加 audio 和 video 渲染分支
+- `frontend/src/lib/mock-data.ts` - 斜杠菜单添加"音频"和"视频"选项
+- `frontend/src/stores/documentStore.ts` - 添加 audio 和 video 的默认 content
+- `frontend/src/lib/api.ts` - 添加文件上传 API（uploadFile, filesAPI）
+
+**完成内容**:
+- AudioBlock：HTML5 `<audio>` 内联播放器，支持播放/暂停、进度拖拽、音量控制，无文件时显示上传入口
+- VideoBlock：HTML5 `<video>` 内联播放器，支持播放/暂停、进度拖拽、音量控制、全屏切换，无文件时显示上传入口
+- 文件上传使用 XMLHttpRequest 支持进度回调
+- 文件大小限制：音频 50MB，视频 200MB
+- 上传时显示进度条
+- 斜杠菜单添加了"音频"（🎵）和"视频"（🎬）选项
+
+### 步骤 9.1：实现文件存储 Service ✅
+
+**修改的文件**:
+- `backend/app/services/file_service.py` - 文件存储 Service（新建）
+
+**完成内容**:
+- `upload_file` — 上传文件，生成唯一文件名，保存到存储，创建 FileAsset 数据库记录
+- `get_file_url` — 获取文件访问 URL（本地存储返回 API URL）
+- `get_file_path` — 获取本地文件路径（用于文件下载）
+- `delete_file` — 删除文件和数据库记录
+- 支持 local / s3 / oss 三种存储方式（local 已实现，s3/oss 为占位）
+- 文件大小限制：图片 10MB，音频 50MB，视频 200MB，其他 50MB
+
+### 步骤 9.2：实现文件 API 路由 ✅
+
+**修改的文件**:
+- `backend/app/routers/files.py` - 文件管理 API 路由（新建）
+- `backend/app/main.py` - 注册文件路由
+
+**完成内容**:
+- `POST /api/files/upload` — 上传文件（multipart/form-data）
+- `GET /api/files/{file_id}` — 获取文件（返回文件内容）
+- `DELETE /api/files/{file_id}` — 删除文件
+- 在 main.py 中注册文件路由到 `/api/files`
+
+## 如何测试阶段 9
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证音频功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **创建音频块**: 使用斜杠命令 `/` 选择"音频"
+2. **上传音频**: 点击上传区域，选择 MP3 文件（不超过 50MB）
+3. **上传进度**: 上传过程中应显示进度条
+4. **播放控制**: 上传完成后，显示播放器，支持播放/暂停、进度拖拽、音量控制
+5. **文件名显示**: 播放器上方显示音频文件名
+
+### 4. 验证视频功能
+
+1. **创建视频块**: 使用斜杠命令 `/` 选择"视频"
+2. **上传视频**: 点击上传区域，选择 MP4 文件（不超过 200MB）
+3. **上传进度**: 上传过程中应显示进度条
+4. **播放控制**: 上传完成后，显示视频播放器，支持播放/暂停、进度拖拽、音量控制、全屏
+5. **全屏模式**: 点击全屏按钮，视频以全屏模式播放
+
+### 5. 检查后端 API
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- `POST /api/files/upload` — 上传文件
+- `GET /api/files/{file_id}` — 获取文件
+- `DELETE /api/files/{file_id}` — 删除文件
+- 数据库 `file_assets` 表中应有对应的记录
+- `backend/storage/` 目录中应有上传的文件
