@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { AIChatAttachment, AIMessage, AIScope } from '@/types/ai';
 import { aiAPI, AIChatResponse, AIReferenceData } from '@/lib/api';
+import { useDocumentStore } from './documentStore';
+import { DocumentBlock } from '@/types/block';
 
 interface AIChatState {
   messages: AIMessage[];
@@ -33,6 +35,57 @@ function mapReferences(refs: AIReferenceData[]): { docId: string; blockId: strin
   }));
 }
 
+/** 将 block 内容转为可读文本 */
+function blockToText(block: DocumentBlock): string {
+  const c = block.content;
+  switch (block.blockType) {
+    case 'h1':
+    case 'h2':
+    case 'h3':
+    case 'text':
+    case 'quote':
+      return (c.text as string) || '';
+    case 'bullet':
+    case 'numbered':
+      return (c.items as string[] || []).map((item) => `- ${item}`).join('\n');
+    case 'todo':
+      return (c.items as { text: string; done: boolean }[] || [])
+        .map((item) => `${item.done ? '[x]' : '[ ]'} ${item.text}`)
+        .join('\n');
+    case 'table': {
+      const headers = c.headers as string[] || [];
+      const rows = c.rows as string[][] || [];
+      const lines = [headers.join(' | ')];
+      for (const row of rows) lines.push(row.join(' | '));
+      return lines.join('\n');
+    }
+    case 'code':
+      return (c.code as string) || '';
+    case 'ai-answer':
+      return (c.text as string) || '';
+    default:
+      return (c.text as string) || JSON.stringify(c);
+  }
+}
+
+/** 从 attachments 中提取文本内容，拼成上下文前缀 */
+function buildAttachmentContext(attachments: AIChatAttachment[]): string {
+  const parts: string[] = [];
+  for (const att of attachments) {
+    if (att.kind === 'block' && att.blockId) {
+      // 从本地 store 取 block 内容
+      const blocks = useDocumentStore.getState().blocks;
+      const block = blocks.find((b) => b.id === att.blockId);
+      if (block) {
+        const text = blockToText(block);
+        if (text.trim()) parts.push(text);
+      }
+    }
+    // document 类型：att.preview 已经包含标题，不额外处理
+  }
+  return parts.join('\n---\n');
+}
+
 export const useAIChatStore = create<AIChatState>((set, get) => ({
   messages: [INITIAL_MESSAGE],
   pendingAttachments: [],
@@ -59,7 +112,7 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
     const trimmed = text.trim();
     if (!trimmed && attachments.length === 0) return;
 
-    const { scope, sessionId } = get();
+    const { sessionId } = get();
 
     const userMsg: AIMessage = {
       id: 'u-' + Date.now(),
@@ -75,7 +128,7 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
       retrieval:
         attachments.length > 0
           ? `正在读取 ${attachments.length} 个拖入的上下文…`
-          : '正在检索相关内容…',
+          : '正在思考…',
       isLoading: true,
     };
 
@@ -86,15 +139,14 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
     }));
 
     try {
-      let result: AIChatResponse & { sessionId?: string };
+      // 从 attachments 提取文本内容，拼到消息前面
+      const attachmentContext = buildAttachmentContext(attachments);
+      const finalMessage = attachmentContext
+        ? `以下是引用的内容：\n---\n${attachmentContext}\n---\n\n用户问题：${trimmed}`
+        : trimmed;
 
-      if (scope === 'doc' && documentId) {
-        // 文档问答模式（复用已有会话以保留对话历史）
-        result = await aiAPI.documentQA(documentId, trimmed, scope, sessionId);
-      } else {
-        // 普通对话模式
-        result = await aiAPI.chat(sessionId, trimmed);
-      }
+      // 统一调用普通对话接口
+      const result = await aiAPI.chat(sessionId, finalMessage);
 
       // 更新 sessionId
       if (result.sessionId) {
@@ -106,9 +158,6 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
         role: 'ai',
         text: result.answer,
         citations: result.references?.length > 0 ? mapReferences(result.references) : undefined,
-        retrieval: result.confidence
-          ? `置信度: ${result.confidence === 'high' ? '高' : result.confidence === 'medium' ? '中' : '低'}`
-          : undefined,
       };
 
       set((s) => ({

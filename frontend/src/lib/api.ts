@@ -490,6 +490,12 @@ export interface AIMessageResponse {
   createdAt: string;
 }
 
+export interface AIContextResponse {
+  context: string;
+  sourceType: string;
+  sourceTitle: string;
+}
+
 /**
  * AI 对话 API
  */
@@ -519,12 +525,29 @@ export const aiAPI = {
   chat: (sessionId: string | null, message: string): Promise<AIChatResponse> =>
     post('/api/ai/chat', { sessionId, message }),
 
-  /** 基于文档问答 */
-  documentQA: (documentId: string, question: string, scope: string, sessionId?: string | null): Promise<AIChatResponse> =>
+  /** 基于文档问答（支持拖拽上下文） */
+  documentQA: (
+    documentId: string | undefined,
+    question: string,
+    scope: string,
+    sessionId?: string | null,
+    contextDocumentId?: string | null,
+    contextBlockIds?: string[] | null,
+  ): Promise<AIChatResponse> =>
     post('/api/ai/document-qa', {
-      documentId,
+      documentId: documentId || undefined,
       question,
       scope: scopeToBackend[scope] || 'current_document',
       sessionId: sessionId || undefined,
+      contextDocumentId: contextDocumentId || undefined,
+      contextBlockIds: contextBlockIds || undefined,
     }),
+
+  /** 获取文档内容作为上下文（拖拽文档时调用） */
+  getDocumentContext: (documentId: string): Promise<AIContextResponse> =>
+    post('/api/ai/context/document', { documentId }),
+
+  /** 获取 Block 内容作为上下文（拖拽 block 时调用） */
+  getBlockContext: (blockId: string): Promise<AIContextResponse> =>
+    post('/api/ai/context/block', { blockId }),
 };

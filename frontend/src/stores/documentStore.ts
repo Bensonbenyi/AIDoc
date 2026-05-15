@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { DocumentTreeNode } from '@/types/document';
 import { DocumentBlock } from '@/types/block';
 import {
+  ApiError,
   documentsAPI,
   blocksAPI,
   type BlockCreate,
@@ -298,7 +299,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }));
     try {
       await blocksAPI.delete(blockId);
-    } catch (error) {
+    } catch (error: unknown) {
+      // 404 表示 block 在后端已不存在，视为删除成功，不回滚
+      if (error instanceof ApiError && error.status === 404) {
+        console.warn('Block 在后端已不存在，跳过删除:', blockId);
+        return;
+      }
       console.error('删除 block 失败:', error);
       // 回滚
       set((s) => ({

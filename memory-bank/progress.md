@@ -921,3 +921,114 @@ npm run dev
 - 需要在 `.env` 中配置有效的 `LLM_API_KEY` 才能获得真实的 AI 回答
 - 未配置 API Key 时，调用 LLM 会失败，前端会显示错误提示
 - RAG 检索功能将在阶段 8 实现，当前文档问答使用简单的文档内容拼接作为上下文
+
+## 阶段 8：AI 文档问答（前端直接提取上下文） ✅
+
+**完成时间**: 2026-05-15
+
+**方案说明**: 采用**前端直接提取上下文**方案。用户拖拽 block 或文档到 AI 聊天框时，前端直接从本地 Zustand store 中读取 block 内容，转换为文本后拼接到用户消息中发送给后端。后端无需查找 block，只需处理普通对话即可。
+
+**核心优势**: 简单可靠，避免了后端 block 查找的时序问题（block 可能尚未保存到数据库）。
+
+### 已完成：前端上下文提取（核心逻辑）
+
+**修改的文件**:
+- `frontend/src/stores/aiChatStore.ts` — 核心重写，前端直接提取 block 内容
+- `backend/app/prompts/general_chat_system.txt` — 更新 prompt 以识别内联引用内容
+
+**完成内容**:
+- `blockToText(block)` — 前端函数，将 block 内容转为可读文本
+  - 支持所有 block 类型：h1/h2/h3/text/quote/bullet/numbered/todo/table/code/ai-answer 等
+  - table 转为管道分隔格式，todo 转为 `[x]`/`[ ]` 格式
+- `buildAttachmentContext(attachments)` — 从 attachments 中提取文本内容
+  - 从本地 `useDocumentStore.getState().blocks` 直接读取 block 数据
+  - 不依赖后端 API，避免 block 未保存导致查找失败
+- `sendMessage` 简化流程：
+  1. 前端提取 attachment 内容 → 拼接为 `以下是引用的内容：\n---\n{内容}\n---\n\n用户问题：{问题}`
+  2. 统一调用 `aiAPI.chat()` 发送（不再调用 `documentQA`）
+  3. 后端 `general_chat_system.txt` prompt 识别"以下是引用的内容"前缀，直接基于引用内容回答
+
+### 已完成：后端 Prompt 更新
+
+**修改的文件**:
+- `backend/app/prompts/general_chat_system.txt` — 添加内联引用识别规则
+
+**关键 prompt 变更**:
+```
+## 信息来源
+1. **用户消息中的引用内容**：如果用户消息中包含"以下是引用的内容"，说明用户拖拽了文档内容到聊天框，你应该基于这些内容来回答问题。
+
+## 行为规则
+1. **直接回答**：如果用户消息中包含引用内容，直接基于引用内容回答问题，不要说"我无法找到"或提醒用户使用其他功能。
+```
+
+### 已完成：后端辅助代码
+
+**修改的文件**:
+- `backend/app/routers/ai.py` — 添加上下文构建调试日志
+- `backend/app/schemas/ai.py` — `AIDocumentQARequest.document_id` 改为可选
+- `frontend/src/lib/api.ts` — `documentQA` 的 `documentId` 参数改为可选
+
+### 已完成：后端 RAG 预建代码（备选，当前不启用）
+
+以下文件已创建但当前阶段不使用，作为未来 RAG 升级的基础：
+
+- `backend/app/services/embedding_service.py` — Embedding 服务（阿里 text-embedding-v4）
+- `backend/app/services/rag_service.py` — RAG 核心服务（索引、检索、上下文扩展）
+- `backend/app/services/bm25_service.py` — BM25 关键词检索
+- `backend/app/services/reranker_service.py` — Reranker 重排序
+- `backend/app/services/summary_service.py` — 文档摘要生成
+- `backend/app/utils/text_splitter.py` — 文本切片工具
+- `backend/app/routers/rag.py` — RAG API 路由（/api/rag/*）
+
+### 已完成：Block 文本转换工具（后端辅助）
+
+**修改的文件**:
+- `backend/app/utils/__init__.py` - utils 包初始化（新建）
+- `backend/app/utils/block_text_converter.py` - Block 文本转换工具（新建）
+
+### 已完成：前端拖拽集成
+
+**已有实现**（阶段 3/7 中已内置）:
+
+- 聊天输入框支持拖拽放置（`useDroppable` 在 AIAssistantPanel.tsx）
+- 拖入文档/block 时显示附件标签（`AttachmentChip` 组件）
+- 发送消息时前端直接从 store 提取 block 内容并拼接到消息中
+- 文档树节点可拖拽到 AI 聊天框（`useDraggable` 在 DocumentTree.tsx）
+- Block 工具栏"问 AI"按钮（`BlockActionMenu` 中的 `onAskAI`）
+- `AppDndProvider` 处理 block→AI 和 document→AI 的拖放逻辑
+
+## 如何测试阶段 8
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 测试前端拖拽功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **拖拽 Block 到 AI 聊天框**: 在编辑器中拖拽一个 block 的拖拽手柄到 AI 聊天区域，应显示附件标签
+2. **"问 AI"按钮**: 点击 block 左侧菜单中的"问 AI"按钮，block 应作为附件添加到聊天输入框
+3. **发送带上下文的消息**: 添加附件后输入问题并发送，AI 应基于拖入的内容回答
+4. **测试用例**: 创建一个包含 "benson is jack's friend." 的 block，拖拽到 AI 聊天框，问"benson是谁的朋友？"，AI 应正确回答"benson 是 jack 的朋友"
+5. **移除附件**: 点击附件标签上的 X 按钮可移除
+6. **无附件发送**: 不添加附件直接提问，AI 应正常回答
+
+### 4. 注意事项
+
+- 需要在 `.env` 中配置有效的 `LLM_API_KEY` 才能获得真实的 AI 回答
+- 拖拽功能依赖 dnd-kit，已在阶段 3 集成
+- RAG 相关代码已预建但当前不启用，仅作为未来升级储备

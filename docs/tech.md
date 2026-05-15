@@ -1712,6 +1712,8 @@ POST
 
 用户直接与 AI 对话，不一定绑定某篇文档。
 
+**当前阶段的主要入口**：前端拖拽 block/文档到 AI 聊天框时，前端直接从本地 store 提取 block 内容，拼接到消息中统一调用此接口。后端 `general_chat_system.txt` prompt 识别"以下是引用的内容"前缀，基于引用内容回答。
+
 ### 权限
 
 Demo 阶段无需登录。
@@ -1722,6 +1724,15 @@ Demo 阶段无需登录。
 {
   "session_id": "session_001",
   "message": "请解释一下什么是可执行文档。"
+}
+```
+
+### 带引用内容的请求示例
+
+```json
+{
+  "session_id": "session_001",
+  "message": "以下是引用的内容：\n---\nbenson is jack's friend.\n---\n\n用户问题：benson是谁的朋友？"
 }
 ```
 
@@ -1753,7 +1764,9 @@ POST
 
 ### 功能
 
-AI 基于文档内容回答用户问题。
+AI 基于文档内容回答用户问题。支持 `context_document_id` 和 `context_block_ids` 参数直接传入上下文。
+
+**注意**：当前阶段前端已改为统一使用 `/api/ai/chat` 接口（前端直接提取 block 内容拼接到消息中），此接口作为备选保留。
 
 ### 权限
 
@@ -2000,41 +2013,72 @@ AI 返回改写建议，用户可以选择替换原文。
 
 ## 10.2 AI 处理流程
 
+### 当前实现：前端直接提取上下文
+
 ```text
-接收用户输入
+用户拖拽 block/文档到 AI 聊天框（或点击"问 AI"按钮）
       ↓
-判断 AI 任务类型
+前端从 Zustand store 读取 block 内容
       ↓
-判断是否需要检索文档
+blockToText() 将 block 转为可读文本
       ↓
-如果需要，读取 document_id / block_id / scope
+拼接为 "以下是引用的内容：\n---\n{内容}\n---\n\n用户问题：{问题}"
       ↓
-执行 Block-aware Hierarchical RAG
+调用 aiAPI.chat() 发送（统一走普通对话接口）
       ↓
-构造 Prompt
+后端 general_chat_system.txt prompt 识别"以下是引用的内容"前缀
       ↓
-调用 GLM-5.1
-      ↓
-解析模型输出
+AI 基于引用内容直接回答
       ↓
 返回 answer + references
       ↓
 保存 AIMessage 和调用日志
 ```
 
+### 无附件时的流程
+
+```text
+用户直接在聊天框输入问题（无拖拽附件）
+      ↓
+前端 sendMessage(text) → aiAPI.chat(sessionId, text)
+      ↓
+后端使用 general_chat_system.txt prompt
+      ↓
+AI 基于通用知识回答
+```
+
 ---
 
-## 10.3 Block-aware Hierarchical RAG 设计
+## 10.3 AI 文档问答方案
 
-本项目采用：
+### 当前实现：前端直接提取上下文（方案 A）
+
+当前阶段采用**前端直接提取上下文**方案：
+
+1. 用户在 AI 侧边栏提问时，可选择将文档或 block 拖拽到聊天框作为上下文
+2. 前端直接从本地 Zustand store 读取 block 内容（`useDocumentStore.getState().blocks`）
+3. 使用 `blockToText()` 将 block 转为文本，拼接到用户消息中
+4. 统一调用 `aiAPI.chat()` 发送给后端
+5. 后端 `general_chat_system.txt` prompt 识别"以下是引用的内容"前缀，基于引用内容回答
+
+**核心优势**：
+- 简单可靠，避免了后端 block 查找的时序问题（block 可能尚未保存到数据库）
+- 前端已有完整的 block 数据，无需额外网络请求
+- 统一走普通对话接口，后端逻辑更简单
+
+**适用场景**：拖拽 block 解释、拖拽文档问答、基于选中内容提问。
+
+### 未来备选：Block-aware Hierarchical RAG（方案 B）
+
+当文档数量增多、需要跨文档语义检索时，可升级为 RAG 方案：
 
 ```text
 Block-aware Hierarchical RAG
 ```
 
-也就是：
+即：以 block 作为基础索引单元，结合文档树、父级标题、相邻 block、文档摘要和文档路径，构造更完整的上下文，再交给 LLM 回答。
 
-> 以 block 作为基础索引单元，同时结合文档树、父级标题、相邻 block、文档摘要和文档路径，构造更完整的上下文，再交给 LLM 回答。
+RAG 相关的后端服务代码已预建（embedding_service、rag_service、bm25_service 等），但当前阶段不启用。
 
 ---
 

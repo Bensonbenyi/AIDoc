@@ -132,10 +132,13 @@ class AIService:
         # System prompt
         if context:
             system_prompt = load_prompt("document_qa_system")
-            messages.append({"role": "system", "content": system_prompt + "\n\n" + context})
+            full_system = system_prompt + "\n\n" + context
+            messages.append({"role": "system", "content": full_system})
+            logger.info(f"使用文档问答 prompt, context 长度={len(context)}, system 总长度={len(full_system)}")
         else:
             system_prompt = load_prompt("general_chat_system")
             messages.append({"role": "system", "content": system_prompt})
+            logger.info("使用通用对话 prompt（无 context）")
 
         # 历史消息
         if history:

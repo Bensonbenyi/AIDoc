@@ -668,173 +668,66 @@
 
 ---
 
-## 阶段 8：RAG 检索系统
+## 阶段 8：AI 文档问答（前端直接提取上下文）
 
-### 步骤 8.1：实现 Embedding Service
+> **方案说明**：采用**前端直接提取上下文**方案。用户拖拽 block 或文档到 AI 聊天框时，
+> 前端直接从本地 Zustand store 中读取 block 内容，转换为文本后拼接到用户消息中发送给后端。
+> 后端无需查找 block，统一走普通对话接口即可。
+>
+> **核心优势**：简单可靠，避免了后端 block 查找的时序问题（block 可能尚未保存到数据库）。
+>
+> RAG（向量检索 + BM25）作为未来备选方案，相关后端服务代码已预建但当前不启用。
 
-**指令：**
-
-创建 `backend/app/services/embedding_service.py`，封装 Embedding 生成逻辑。要求：
-
-1. 创建 `EmbeddingService` 类：
-   - 初始化时加载 Embedding 配置（API Key、Base URL、Model）
-   - 使用 `httpx.AsyncClient` 调用阿里 Qwen text-embedding-v4 API
-2. `embed_text(text: str) -> list[float]`：
-   - 将单段文本转换为向量
-   - 返回 1024 维浮点数组
-3. `embed_batch(texts: list[str]) -> list[list[float]]`：
-   - 批量生成向量
-   - 处理 API 的批量限制（如单次最多 10 条）
-4. 错误处理和重试机制
-
-### 步骤 8.2：实现 Block 文本转换工具
+### 步骤 8.1：前端 Block 文本提取与上下文构建
 
 **指令：**
 
-创建 `backend/app/utils/block_text_converter.py`，将不同类型的 block 转换为可索引的纯文本。要求：
+修改 `frontend/src/stores/aiChatStore.ts`，实现前端直接从本地 store 提取 block 内容。要求：
 
-1. `convert_block_to_text(block_type, content) -> str`：
-   - `paragraph` / `heading`：直接返回 text 字段
-   - `table`：转换为 Markdown 表格格式或 "表格：标题\n行1 数据\n行2 数据" 格式
-   - `todo`：转换为 "待办事项：文本，状态：完成/未完成"
-   - `bullet` / `numbered`：转换为列表文本
-   - `code`：返回 "Python 代码块：\n代码内容\n运行结果：输出摘要"
-   - `chart_3d`：返回 "3D 图表：标题\n数据摘要"
-   - `whiteboard`：返回白板的标题或说明文字（不做图像理解）
-   - `doclink`：返回 "文档链接：目标标题\n路径"
-   - `quote`：返回引用文本
-   - `divider`：跳过，不索引
-   - `image` / `file`：返回文件名和描述
-   - `audio`：返回 "音频：文件名\n描述"（本阶段不做 ASR 语音识别，只索引文件名和用户填写的描述文字）
-   - `video`：返回 "视频：文件名\n描述"（本阶段不做视频内容理解，只索引文件名和用户填写的描述文字）
-   - `ai_answer`：返回 AI 回答文本
-2. `convert_block_to_bm25_text(block_type, content) -> str`：
-   - 返回适合关键词检索的文本（可能与索引文本略有不同，如去除格式标记）
+1. 创建 `blockToText(block)` 函数，将 block 内容转为可读文本：
+   - `h1` / `h2` / `h3` / `text` / `quote`：返回 `content.text`
+   - `bullet` / `numbered`：返回 `- item` 格式列表
+   - `todo`：返回 `[x]` / `[ ]` 格式列表
+   - `table`：返回管道分隔格式（headers | rows）
+   - `code`：返回 `content.code`
+   - 其他类型返回 `content.text` 或 JSON.stringify
+2. 创建 `buildAttachmentContext(attachments)` 函数：
+   - 从 `useDocumentStore.getState().blocks` 直接读取 block 数据
+   - 遍历 attachments，对 `kind === 'block'` 的附件调用 `blockToText`
+   - 用 `\n---\n` 分隔多个 block 的文本
+3. 修改 `sendMessage` 函数：
+   - 调用 `buildAttachmentContext` 提取附件内容
+   - 如果有附件内容，拼接为 `以下是引用的内容：\n---\n{内容}\n---\n\n用户问题：{问题}`
+   - 统一调用 `aiAPI.chat()` 发送（不再调用 `documentQA`）
+   - 移除之前的 scope 判断逻辑
 
-### 步骤 8.3：实现文本切片工具
-
-**指令：**
-
-创建 `backend/app/utils/text_splitter.py`，实现长文本切片功能。要求：
-
-1. `split_text(text, max_chunk_size=500, overlap=50) -> list[str]`：
-   - 按段落优先切分
-   - 如果单个段落超过 max_chunk_size，按句子切分
-   - 保留 overlap 个字符的重叠区域
-   - 返回切片列表
-2. 切片时保留完整的句子，不在句子中间断开
-3. 每个 chunk 保留所属 block_id 的关联信息
-
-### 步骤 8.4：实现 RAG Service
+### 步骤 8.2：更新后端 Prompt 以识别内联引用
 
 **指令：**
 
-创建 `backend/app/services/rag_service.py`，实现 Block-aware Hierarchical RAG 的完整流程。要求：
+修改 `backend/app/prompts/general_chat_system.txt`，使 AI 能识别消息中的内联引用内容。要求：
 
-1. `index_document(db, document_id)`：
-   - 获取文档所有 block
-   - 对每个 block 调用 `block_text_converter` 生成可索引文本
-   - 如果文本过长，调用 `text_splitter` 切片
-   - 为每个 chunk 生成 embedding
-   - 写入 `knowledge_chunks` 表
-   - 同时生成/更新文档摘要
-2. `reindex_all(db)`：
-   - 重新索引所有文档
-3. `search(db, query, scope, document_id=None, top_k=5) -> list`：
-   - **向量检索**：对 query 生成 embedding，在 pgvector 中执行余弦相似度搜索
-   - **BM25 检索**：使用 PostgreSQL 的 `tsvector` + `tsquery` 全文检索
-   - **元数据过滤**：根据 scope 过滤 document_id 范围
-   - **结果合并**：将向量检索和 BM25 检索的结果合并，去重
-   - **Reranker 重排**（可选）：如果配置了 reranker 服务，对合并结果重排
-   - 返回 top_k 个结果
-4. `expand_context(db, chunks) -> dict`：
-   - 对每个命中的 chunk：
-     - 获取相邻 block（前一个和后一个）
-     - 获取父级 heading（向上查找最近的 heading block）
-   - 获取当前文档摘要
-   - 获取文档路径
-   - 组装完整的 knowledge context
-5. `build_knowledge_context(expanded_context) -> str`：
-   - 将扩展后的上下文格式化为 prompt 中使用的 knowledge context 文本
-   - 格式参照 tech.md 10.10 节
+1. 在"信息来源"部分添加：
+   - 如果用户消息中包含"以下是引用的内容"，说明用户拖拽了文档内容到聊天框
+   - AI 应基于这些内容来回答问题
+2. 在"行为规则"部分添加：
+   - 如果用户消息中包含引用内容，直接基于引用内容回答，不要说"我无法找到"
 
-### 步骤 8.5：实现 BM25 检索
+### 步骤 8.3：后端辅助优化
 
 **指令：**
 
-创建 `backend/app/services/bm25_service.py`，基于 PostgreSQL 全文检索实现 BM25。要求：
+对后端 AI 模块进行辅助优化。要求：
 
-1. 在 KnowledgeChunk 模型中添加 `search_vector` 列（`TSVECTOR` 类型）
-2. 创建数据库触发器或在保存时自动更新 `search_vector`
-3. `search(query, scope_filter, top_k) -> list`：
-   - 使用 `plainto_tsquery` 构造查询
-   - 使用 `ts_rank_cd` 计算相关度评分
-   - 支持中文分词（使用 `zhcfg` 或 `jieba` 预处理）
-4. 如果 PostgreSQL 中文分词配置复杂，可以退化为简单的 `LIKE` + `ILIKE` 模糊匹配作为 MVP 方案
+1. `backend/app/schemas/ai.py`：`AIDocumentQARequest.document_id` 改为可选字段
+2. `backend/app/routers/ai.py`：为上下文构建添加调试日志（logger.info/warning）
+3. `frontend/src/lib/api.ts`：`documentQA` 的 `documentId` 参数改为可选
 
-### 步骤 8.6：实现 Reranker（可选）
+### 步骤 8.4：后端 Block 文本转换工具（辅助）
 
 **指令：**
 
-创建 `backend/app/services/reranker_service.py`。要求：
-
-1. 如果配置了 reranker API（如阿里云 DashScope 的 reranker 服务）：
-   - 调用 reranker API 对候选结果重排
-   - 返回重排后的结果
-2. 如果未配置 reranker：
-   - 使用简单的加权合并策略：向量得分 * 0.6 + BM25 得分 * 0.4
-   - 按合并得分排序
-
-### 步骤 8.7：实现文档摘要 Service
-
-**指令：**
-
-创建 `backend/app/services/summary_service.py`。要求：
-
-1. `generate_summary(db, document_id)`：
-   - 获取文档所有 block 内容
-   - 拼接为文本
-   - 调用 LLM 生成摘要
-   - 保存到 `document_summaries` 表
-2. `get_summary(db, document_id) -> str`：
-   - 获取缓存的文档摘要
-   - 如果不存在，触发生成
-3. 摘要生成时机：
-   - 文档首次被索引时
-   - 文档内容大幅变更时（可选，基于 block 数量变化判断）
-
-### 步骤 8.8：实现 RAG API 路由
-
-**指令：**
-
-创建 `backend/app/routers/rag.py`。要求：
-
-1. `POST /api/rag/reindex` — 重建文档索引：
-   - 接收 `RAGReindexRequest`
-   - 调用 `rag_service.index_document`
-   - 返回索引结果
-2. `POST /api/rag/search` — 检索相关 block：
-   - 接收 `RAGSearchRequest`
-   - 调用 `rag_service.search`
-   - 返回 `RAGSearchResponse`
-3. `POST /api/rag/reindex-all` — 重建全部索引（管理用）
-
-### 步骤 8.9：对接 RAG 到 AI 文档问答
-
-**指令：**
-
-修改 `backend/app/routers/ai.py` 中的 `document-qa` 接口，使用真实的 RAG 检索。要求：
-
-1. 收到文档问答请求后：
-   - 根据 scope 确定检索范围
-   - 调用 `rag_service.search` 检索相关 block
-   - 调用 `rag_service.expand_context` 扩展上下文
-   - 调用 `rag_service.build_knowledge_context` 构造知识上下文
-   - 将知识上下文传给 `ai_service.chat`
-2. 在 AI 响应中返回引用来源信息
-3. 自动触发索引更新：
-   - 当文档 block 被创建/更新/删除时，自动更新该文档的 RAG 索引
-   - 在 `block_service` 的增删改操作后添加索引更新钩子（使用 FastAPI BackgroundTasks 异步执行）
+创建 `backend/app/utils/block_text_converter.py`，为后端其他模块提供 block 文本转换。当前阶段主要用于 `document-qa` 接口的默认上下文构建。
 
 ---
 
