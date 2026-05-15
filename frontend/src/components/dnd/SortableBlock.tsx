@@ -3,6 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { BlockType, DocumentBlock } from '@/types/block';
 import { BlockRenderer } from '@/components/editor/BlockRenderer';
 import { BlockActionMenu } from '@/components/editor/BlockActionMenu';
@@ -51,18 +52,45 @@ export function SortableBlock({ block }: Props) {
   };
 
   const isHighlighted = highlightedBlockId === block.id;
+  const blockRef = useRef<HTMLDivElement>(null);
+
+  // 当 block 被高亮时（引用跳转），滚动到可视区域
+  useEffect(() => {
+    if (isHighlighted && blockRef.current) {
+      blockRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [isHighlighted]);
 
   const askAI = () => {
-    addPendingAttachment({
+    const attachment = {
       id: `block-${block.id}`,
-      kind: 'block',
+      kind: 'block' as const,
       title: blockTitle(block),
       icon: blockIcon(block.blockType),
       preview: blockTitle(block),
       docId: block.documentId,
       blockId: block.id,
       blockType: block.blockType,
-    });
+    };
+
+    // 按 block 类型自动构造问题
+    const questionMap: Record<string, string> = {
+      code: '请解释这段代码的功能和逻辑',
+      table: '请分析这个表格中的数据，给出关键发现和趋势',
+      chart3d: '请解读这个图表的数据含义和趋势',
+      h1: '请总结这个章节的核心内容',
+      h2: '请总结这个章节的核心内容',
+      h3: '请总结这个章节的核心内容',
+      quote: '请解释这段引用的含义',
+      todo: '请帮我分析这些待办事项，给出优先级建议',
+    };
+
+    const question = questionMap[block.blockType];
+    if (question) {
+      useAIChatStore.getState().askAIWithQuestion(question, attachment);
+    } else {
+      addPendingAttachment(attachment);
+    }
     if (rightSidebarCollapsed) toggleRightSidebar();
   };
 
@@ -160,7 +188,10 @@ export function SortableBlock({ block }: Props) {
 
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        (blockRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+      }}
       data-block-id={block.id}
       tabIndex={0}
       style={style}

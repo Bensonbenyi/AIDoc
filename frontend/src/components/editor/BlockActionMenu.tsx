@@ -35,6 +35,17 @@ function isTextLike(type?: BlockType) {
   return type === 'text' || type === 'h1' || type === 'h2' || type === 'h3' || type === 'quote';
 }
 
+const AI_LABELS: Partial<Record<BlockType, string>> = {
+  code: 'AI 解释代码',
+  table: 'AI 分析数据',
+  chart3d: 'AI 解读图表',
+  h1: 'AI 总结',
+  h2: 'AI 总结',
+  h3: 'AI 总结',
+  quote: 'AI 解释',
+  todo: 'AI 分析',
+};
+
 export function BlockActionMenu({
   label,
   onDelete,
@@ -169,7 +180,7 @@ export function BlockActionMenu({
             className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-foreground/85 hover:bg-muted"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            问 AI
+            {AI_LABELS[blockType || 'text'] || '问 AI'}
           </button>
           <button
             type="button"

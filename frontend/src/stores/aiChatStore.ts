@@ -7,6 +7,7 @@ import { DocumentBlock } from '@/types/block';
 interface AIChatState {
   messages: AIMessage[];
   pendingAttachments: AIChatAttachment[];
+  pendingQuestion: string | null;
   scope: AIScope;
   isStreaming: boolean;
   sessionId: string | null;
@@ -14,6 +15,8 @@ interface AIChatState {
   addPendingAttachment: (attachment: AIChatAttachment) => void;
   removePendingAttachment: (id: string) => void;
   clearPendingAttachments: () => void;
+  askAIWithQuestion: (question: string, attachment: AIChatAttachment) => void;
+  consumePendingQuestion: () => string | null;
   sendMessage: (text: string, attachments?: AIChatAttachment[], documentId?: string) => Promise<void>;
   setScope: (scope: AIScope) => void;
   clearMessages: () => void;
@@ -89,6 +92,7 @@ function buildAttachmentContext(attachments: AIChatAttachment[]): string {
 export const useAIChatStore = create<AIChatState>((set, get) => ({
   messages: [INITIAL_MESSAGE],
   pendingAttachments: [],
+  pendingQuestion: null,
   scope: 'doc',
   isStreaming: false,
   sessionId: null,
@@ -107,6 +111,24 @@ export const useAIChatStore = create<AIChatState>((set, get) => ({
   },
 
   clearPendingAttachments: () => set({ pendingAttachments: [] }),
+
+  askAIWithQuestion: (question, attachment) => {
+    set((s) => {
+      const exists = s.pendingAttachments.some((item) => item.id === attachment.id);
+      return {
+        pendingAttachments: exists ? s.pendingAttachments : [...s.pendingAttachments, attachment],
+        pendingQuestion: question,
+      };
+    });
+  },
+
+  consumePendingQuestion: () => {
+    const { pendingQuestion } = get();
+    if (pendingQuestion) {
+      set({ pendingQuestion: null });
+    }
+    return pendingQuestion;
+  },
 
   sendMessage: async (text: string, attachments = [], documentId?: string) => {
     const trimmed = text.trim();

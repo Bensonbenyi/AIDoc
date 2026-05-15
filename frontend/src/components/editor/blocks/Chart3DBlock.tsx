@@ -6,6 +6,8 @@ import { chartsAPI, Chart3DCreateData } from '@/lib/api';
 import { useDocumentStore } from '@/stores/documentStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAIChatStore } from '@/stores/aiChatStore';
+import { useAppStore } from '@/stores/appStore';
 import {
   BarChart3,
   Maximize2,
@@ -19,6 +21,7 @@ import {
   Download,
   Table2,
   Code2,
+  Sparkles,
 } from 'lucide-react';
 
 // 动态导入 Plotly 以避免 SSR 问题
@@ -340,6 +343,30 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
     }
   };
 
+  // AI 解读图表
+  const askAI = useCallback(() => {
+    const askAIWithQuestion = useAIChatStore.getState().askAIWithQuestion;
+    const rightSidebarCollapsed = useAppStore.getState().rightSidebarCollapsed;
+    const toggleRightSidebar = useAppStore.getState().toggleRightSidebar;
+
+    const preview = chartData
+      ? `标题: ${chartData.title}\nX轴: ${chartData.x?.join(', ')}\nY轴: ${chartData.y?.join(', ')}${chartData.z ? `\nZ轴: ${chartData.z.join(', ')}` : ''}`
+      : '';
+
+    askAIWithQuestion('请解读这个图表的数据含义和趋势', {
+      id: `block-${block.id}`,
+      kind: 'block',
+      title: chartData?.title || '3D 图表',
+      icon: '▥',
+      preview,
+      docId: block.documentId,
+      blockId: block.id,
+      blockType: block.blockType,
+    });
+
+    if (rightSidebarCollapsed) toggleRightSidebar();
+  }, [block.id, block.documentId, block.blockType, chartData]);
+
   // 渲染 Plotly 图表
   const renderPlotlyChart = () => {
     if (!chartData) return null;
@@ -485,6 +512,15 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
         </div>
         <div className="flex items-center gap-2">
           {renderSaveStatus()}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={askAI}
+            title="AI 解读图表"
+            className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+          >
+            <Sparkles className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost"
             size="sm"

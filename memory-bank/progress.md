@@ -1126,3 +1126,187 @@ npm run dev
 - `DELETE /api/files/{file_id}` — 删除文件
 - 数据库 `file_assets` 表中应有对应的记录
 - `backend/storage/` 目录中应有上传的文件
+
+## 阶段 10：系统日志与管理 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 10.1：实现日志工具 ✅
+
+**修改的文件**:
+- `backend/app/utils/__init__.py` - 更新导出 logger 工具
+- `backend/app/utils/logger.py` - 日志工具模块（新建）
+
+**完成内容**:
+- 使用 `loguru` 配置日志（已在 main.py 中配置控制台和文件输出）
+- `log_to_db(db, log_type, message, metadata)` — 将关键操作记录到 `system_logs` 表
+- `@log_operation(log_type)` 装饰器 — 自动记录函数调用到数据库和 loguru，成功/失败均记录
+- 支持从函数参数中自动提取 db 会话
+
+### 步骤 10.2：实现系统管理 API ✅
+
+**修改的文件**:
+- `backend/app/schemas/system.py` - 添加 SystemLogResponse、SystemLogListResponse、SystemInitResponse
+- `backend/app/routers/system.py` - 系统管理路由（新建）
+- `backend/app/main.py` - 注册系统路由
+- `backend/app/schemas/__init__.py` - 导出新 Schema
+
+**完成内容**:
+- `GET /api/system/status` — 系统状态查询：
+  - 数据库连接状态
+  - AI 服务可用性（检查 LLM 配置是否存在）
+  - 存储服务可用性（检查本地存储目录是否存在）
+  - 文档/block 数量统计
+- `GET /api/system/logs` — 查看系统日志：
+  - 支持按 `log_type` 筛选
+  - 支持分页（page, page_size）
+  - 按创建时间倒序排列
+- `POST /api/system/init` — 初始化系统：
+  - 创建默认文档空间的初始文档树（项目总览/产品设计/技术实现）
+  - 防止重复初始化（已有文档时跳过）
+  - 记录初始化日志到数据库
+
+## 如何测试阶段 10
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 测试系统状态接口
+
+```bash
+# 获取系统状态
+curl http://localhost:8000/api/system/status
+```
+
+验证返回：database_connected、ai_service_available、storage_service_available、document_count、block_count
+
+### 3. 测试系统初始化
+
+```bash
+# 初始化系统（创建默认文档树）
+curl -X POST http://localhost:8000/api/system/init
+```
+
+验证：返回 success: true，documents_created 为创建的文档数量
+
+### 4. 测试系统日志
+
+```bash
+# 查看所有日志
+curl http://localhost:8000/api/system/logs
+
+# 按类型筛选
+curl "http://localhost:8000/api/system/logs?log_type=document_update"
+
+# 分页
+curl "http://localhost:8000/api/system/logs?page=1&page_size=10"
+```
+
+### 5. 通过 Swagger UI 测试
+
+访问 http://localhost:8000/docs，找到"系统管理"分组，测试所有接口。
+
+### 6. 验证日志记录
+
+在执行其他操作（如创建文档、AI 对话）后，检查 `/api/system/logs` 是否有对应的日志记录。
+
+## 阶段 11：前端 AI 能力增强 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 11.1：实现 Block 级别 AI 交互 ✅
+
+**修改的文件**:
+- `frontend/src/stores/aiChatStore.ts` - 添加 `pendingQuestion`、`askAIWithQuestion`、`consumePendingQuestion`
+- `frontend/src/components/sidebar/AIAssistantPanel.tsx` - 处理 pendingQuestion 自动发送
+- `frontend/src/components/editor/blocks/CodeBlock.tsx` - 添加"AI 解释"按钮
+- `frontend/src/components/editor/blocks/TableBlock.tsx` - 添加"AI 分析"按钮
+- `frontend/src/components/editor/blocks/Chart3DBlock.tsx` - 添加 AI 解读图表按钮
+- `frontend/src/components/dnd/SortableBlock.tsx` - 按 block 类型自动构造 AI 问题
+- `frontend/src/components/editor/BlockActionMenu.tsx` - 按 block 类型显示不同 AI 按钮文字
+
+**完成内容**:
+- aiChatStore 新增 `askAIWithQuestion(question, attachment)` 方法：同时设置待发送附件和预填问题
+- aiChatStore 新增 `consumePendingQuestion()` 方法：消费预填问题（一次性读取）
+- AIAssistantPanel 监听 `pendingQuestion` 变化，自动发送消息到 AI
+- CodeBlock 工具栏添加"AI 解释"按钮（紫色，Sparkles 图标），点击后自动发送"请解释这段代码的功能和逻辑"
+- TableBlock 底部操作栏添加"AI 分析"按钮，点击后自动发送"请分析这个表格中的数据"
+- Chart3DBlock 工具栏添加 AI 解读按钮，点击后自动发送"请解读这个图表的数据含义和趋势"
+- SortableBlock 的通用"问 AI"功能按 block 类型自动构造问题（code→解释代码, table→分析数据, chart3d→解读图表, h1/h2/h3→总结章节, quote→解释引用, todo→分析待办）
+- BlockActionMenu 的"问 AI"按钮文字按 block 类型动态显示（如"AI 解释代码"、"AI 分析数据"）
+
+### 步骤 11.2：实现引用跳转功能 ✅
+
+**修改的文件**:
+- `frontend/src/components/dnd/SortableBlock.tsx` - 添加 scroll-into-view 行为
+- `frontend/src/components/sidebar/AIAssistantPanel.tsx` - 高亮超时改为 3 秒
+
+**完成内容**:
+- SortableBlock 添加 `useEffect`：当 `isHighlighted` 变为 true 时，自动 `scrollIntoView({ behavior: 'smooth', block: 'center' })`
+- 使用 ref callback 合并 dnd-kit 的 `setNodeRef` 和自定义 `blockRef`
+- 引用点击高亮持续时间从 2 秒延长到 3 秒
+- 跨文档引用跳转：点击引用先 `setActiveDocId` 切换文档，再 `setHighlightedBlockId` 高亮目标 block，block 渲染后自动滚动到可视区域
+
+### 步骤 11.3：完善 AI 回答 Block ✅
+
+**修改的文件**:
+- `frontend/src/components/editor/blocks/AIAnswerBlock.tsx` - 完全重写
+- `frontend/package.json` - 添加 react-markdown 依赖
+
+**完成内容**:
+- 安装 `react-markdown` 库用于 Markdown 渲染
+- AIAnswerBlock 完全重写，新功能包括：
+  - Markdown 渲染：使用 ReactMarkdown 渲染 AI 回答的 Markdown 内容（支持标题、列表、代码块、链接等）
+  - 引用来源列表：可折叠展示，点击引用跳转到对应 block（3 秒高亮 + 滚动定位）
+  - "复制"按钮：复制 AI 回答内容到剪贴板
+  - "插入"按钮：将 AI 回答作为文本 block 插入到当前 block 下方
+  - "继续"按钮：将 AI 回答作为上下文发送到 AI 侧边栏继续对话
+  - 空状态展示：内容为空时显示"生成中..."
+  - 样式：使用 Tailwind prose 类美化 Markdown 渲染，indigo 色系保持一致
+
+## 如何测试阶段 11
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证 Block 级别 AI 交互
+
+在浏览器中打开 http://localhost:3000：
+
+1. **代码块 AI 按钮**: 创建代码块，写入代码后，工具栏应出现紫色"AI 解释"按钮，点击后自动发送到 AI 侧边栏
+2. **表格块 AI 按钮**: 创建表格块，底部应出现"AI 分析"按钮
+3. **图表块 AI 按钮**: 创建 3D 图表块，工具栏应出现 AI 解读按钮
+4. **通用"问 AI"**: 任何 block 的菜单中点击"问 AI"，应按 block 类型自动构造问题
+5. **自动发送**: 点击 AI 按钮后，AI 侧边栏自动打开并发送预设问题
+
+### 4. 验证引用跳转
+
+1. **同文档跳转**: 在 AI 回答中点击引用来源，应滚动到对应 block 并高亮 3 秒
+2. **跨文档跳转**: 如果引用在其他文档，应先切换文档再定位到 block
+3. **滚动动画**: 滚动应平滑过渡到目标位置
+
+### 5. 验证 AI 回答 Block
+
+1. **Markdown 渲染**: AI 回答应正确渲染 Markdown 格式（标题、列表、代码块等）
+2. **引用来源**: 如果有引用来源，应显示可折叠的引用列表
+3. **复制按钮**: 点击"复制"应将内容复制到剪贴板
+4. **插入按钮**: 点击"插入"应在当前 block 下方创建新的文本 block
+5. **继续按钮**: 点击"继续"应将回答发送到 AI 侧边栏继续对话

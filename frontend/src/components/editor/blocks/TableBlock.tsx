@@ -1,7 +1,10 @@
 'use client';
 
-import { Columns3, Plus, Rows3, Trash2 } from 'lucide-react';
+import { Columns3, Plus, Rows3, Sparkles, Trash2 } from 'lucide-react';
 import { DocumentBlock } from '@/types/block';
+import { useCallback } from 'react';
+import { useAIChatStore } from '@/stores/aiChatStore';
+import { useAppStore } from '@/stores/appStore';
 
 interface Props {
   block: DocumentBlock;
@@ -13,6 +16,26 @@ export function TableBlock({ block, onUpdate }: Props) {
   const headers = rawHeaders.length > 0 ? rawHeaders : ['列 1'];
   const rawRows = (block.content.rows as string[][]) || [];
   const rows = rawRows.length > 0 ? rawRows : [headers.map(() => '')];
+
+  const askAI = useCallback(() => {
+    const askAIWithQuestion = useAIChatStore.getState().askAIWithQuestion;
+    const rightSidebarCollapsed = useAppStore.getState().rightSidebarCollapsed;
+    const toggleRightSidebar = useAppStore.getState().toggleRightSidebar;
+
+    const preview = headers.join(' | ') + '\n' + rows.slice(0, 3).map((r) => r.join(' | ')).join('\n');
+    askAIWithQuestion('请分析这个表格中的数据，给出关键发现和趋势', {
+      id: `block-${block.id}`,
+      kind: 'block',
+      title: '表格',
+      icon: '▦',
+      preview,
+      docId: block.documentId,
+      blockId: block.id,
+      blockType: block.blockType,
+    });
+
+    if (rightSidebarCollapsed) toggleRightSidebar();
+  }, [block.id, block.documentId, block.blockType, headers, rows]);
 
   const updateHeader = (idx: number, val: string) => {
     const newHeaders = [...headers];
@@ -136,6 +159,14 @@ export function TableBlock({ block, onUpdate }: Props) {
           <Plus className="h-3.5 w-3.5" />
           <Columns3 className="h-3.5 w-3.5" />
           添加列
+        </button>
+        <button
+          type="button"
+          onClick={askAI}
+          className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-purple-600 transition-colors hover:bg-purple-50"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          AI 分析
         </button>
       </div>
     </div>

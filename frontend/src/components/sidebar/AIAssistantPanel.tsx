@@ -39,7 +39,7 @@ function AIMessageView({ msg }: { msg: AIMessage }) {
   const handleCiteClick = (docId: string, blockId: string) => {
     setActiveDocId(docId);
     setHighlightedBlockId(blockId);
-    setTimeout(() => setHighlightedBlockId(null), 2000);
+    setTimeout(() => setHighlightedBlockId(null), 3000);
   };
 
   return (
@@ -185,6 +185,7 @@ export function AIAssistantPanel() {
     isStreaming,
     scope,
     setScope,
+    consumePendingQuestion,
   } = useAIChatStore();
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar);
   const activeDocId = useAppStore((s) => s.activeDocId);
@@ -197,6 +198,18 @@ export function AIAssistantPanel() {
     id: 'ai-chat-drop',
     data: { type: 'ai-chat' },
   });
+
+  // 处理 pendingQuestion：当 block 级别 AI 按钮设置问题时自动发送
+  useEffect(() => {
+    const pending = consumePendingQuestion();
+    if (pending && !isStreaming) {
+      // 使用 setTimeout 确保 pendingAttachments 已更新
+      setTimeout(() => {
+        const attachments = useAIChatStore.getState().pendingAttachments;
+        sendMessage(pending, attachments, activeDocId);
+      }, 50);
+    }
+  }, [consumePendingQuestion, isStreaming, sendMessage, activeDocId]);
 
   useEffect(() => {
     if (msgsRef.current) {

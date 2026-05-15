@@ -3,8 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { DocumentBlock } from '@/types/block';
-import { Play, Check, X, Loader2, RotateCw } from 'lucide-react';
+import { Play, Check, X, Loader2, RotateCw, Sparkles } from 'lucide-react';
 import { codeExecutionAPI } from '@/lib/api';
+import { useAIChatStore } from '@/stores/aiChatStore';
+import { useAppStore } from '@/stores/appStore';
 
 // Monaco Editor 使用 dynamic import 避免 SSR 问题
 const MonacoEditor = dynamic(
@@ -34,6 +36,32 @@ export function CodeBlock({ block, onUpdate }: Props) {
     setStatus((block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle');
     setExecTime(block.content.executionTime as string | undefined);
   }, [block.content]);
+
+  const askAI = useCallback(() => {
+    const addPendingAttachment = useAIChatStore.getState().addPendingAttachment;
+    const askAIWithQuestion = useAIChatStore.getState().askAIWithQuestion;
+    const rightSidebarCollapsed = useAppStore.getState().rightSidebarCollapsed;
+    const toggleRightSidebar = useAppStore.getState().toggleRightSidebar;
+
+    const attachment = {
+      id: `block-${block.id}`,
+      kind: 'block' as const,
+      title: '代码块',
+      icon: '⌘',
+      preview: code.slice(0, 100),
+      docId: block.documentId,
+      blockId: block.id,
+      blockType: block.blockType,
+    };
+
+    if (code.trim()) {
+      askAIWithQuestion('请解释这段代码的功能和逻辑', attachment);
+    } else {
+      addPendingAttachment(attachment);
+    }
+
+    if (rightSidebarCollapsed) toggleRightSidebar();
+  }, [block.id, block.documentId, block.blockType, code]);
 
   const runCode = useCallback(async () => {
     if (!code.trim()) return;
@@ -144,13 +172,24 @@ export function CodeBlock({ block, onUpdate }: Props) {
             {st.icon} {st.text}
           </span>
         </div>
-        <button
-          onClick={runCode}
-          disabled={status === 'running' || !code.trim()}
-          className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium transition-all ${getButtonClass()}`}
-        >
-          {getButtonContent()}
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={askAI}
+            disabled={!code.trim()}
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            title="AI 解释代码"
+          >
+            <Sparkles className="w-3 h-3" />
+            AI 解释
+          </button>
+          <button
+            onClick={runCode}
+            disabled={status === 'running' || !code.trim()}
+            className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium transition-all ${getButtonClass()}`}
+          >
+            {getButtonContent()}
+          </button>
+        </div>
       </div>
 
       {/* Monaco Editor */}

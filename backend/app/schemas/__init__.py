@@ -28,7 +28,13 @@ from app.schemas.rag import (
 from app.schemas.code_execution import CodeExecuteRequest, CodeExecuteResponse
 from app.schemas.chart import Chart3DCreateRequest, Chart3DResponse
 from app.schemas.file import FileUploadResponse
-from app.schemas.system import HealthResponse, SystemStatusResponse
+from app.schemas.system import (
+    HealthResponse,
+    SystemStatusResponse,
+    SystemLogResponse,
+    SystemLogListResponse,
+    SystemInitResponse,
+)
 
 __all__ = [
     # Document
@@ -67,4 +73,7 @@ __all__ = [
     # System
     "HealthResponse",
     "SystemStatusResponse",
+    "SystemLogResponse",
+    "SystemLogListResponse",
+    "SystemInitResponse",
 ]
