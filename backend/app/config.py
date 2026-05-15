@@ -100,12 +100,24 @@ class Settings(BaseSettings):
 
     # 代码执行配置
     CODE_EXECUTION_MODE: str = Field(
-        default="pyodide",
-        description="代码执行模式: pyodide / backend"
+        default="docker",
+        description="代码执行模式: docker / pyodide"
     )
     CODE_EXECUTION_TIMEOUT: int = Field(
         default=30,
         description="代码执行超时时间（秒）"
+    )
+    DOCKER_IMAGE: str = Field(
+        default="aidoc-python-runner",
+        description="代码执行 Docker 镜像名称"
+    )
+    DOCKER_MEMORY_LIMIT: str = Field(
+        default="256m",
+        description="Docker 容器内存限制"
+    )
+    DOCKER_CPU_LIMIT: float = Field(
+        default=0.5,
+        description="Docker 容器 CPU 限制（核数）"
     )
 
     # 日志配置

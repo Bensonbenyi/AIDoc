@@ -28,6 +28,7 @@ class BlockType(str, Enum):
 
 
 class BlockCreate(BaseModel):
+    id: uuid.UUID | None = Field(None, description="Block ID（批量保存时用于保留已有 block）")
     block_type: BlockType = Field(..., description="Block 类型")
     content: dict = Field(default_factory=dict, description="Block 内容")
     properties: dict | None = Field(None, description="Block 属性")

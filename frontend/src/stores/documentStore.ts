@@ -495,6 +495,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     set({ isSaving: true });
     try {
       const blockCreates: BlockCreate[] = blocks.map((b, i) => ({
+        id: b.id,
         blockType: toBackendBlockType(b.blockType),
         content: b.content,
         properties: b.properties,

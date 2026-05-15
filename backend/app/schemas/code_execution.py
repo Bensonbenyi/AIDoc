@@ -21,7 +21,7 @@ class CodeExecuteRequest(BaseModel):
 class CodeExecuteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    execution_id: uuid.UUID
+    id: uuid.UUID
     status: ExecutionStatus
     stdout: str = ""
     stderr: str = ""

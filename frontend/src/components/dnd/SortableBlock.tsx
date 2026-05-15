@@ -95,6 +95,12 @@ export function SortableBlock({ block }: Props) {
       return;
     }
 
+    // 焦点在 Monaco Editor 内时，不拦截键盘事件
+    const eventTarget = e.target as HTMLElement;
+    if (eventTarget.closest('.monaco-editor')) {
+      return;
+    }
+
     const container = e.currentTarget;
     const editable = focusedEditableElement(container);
     const index = blocks.findIndex((item) => item.id === block.id);

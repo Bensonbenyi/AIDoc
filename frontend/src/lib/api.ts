@@ -255,6 +255,7 @@ export interface DocumentDetail {
 }
 
 export interface BlockCreate {
+  id?: string;
   blockType: string;
   content: Record<string, unknown>;
   properties?: Record<string, unknown>;
@@ -322,4 +323,50 @@ export const blocksAPI = {
     patch(`/api/blocks/${blockId}`, data),
 
   delete: (blockId: string): Promise<void> => del(`/api/blocks/${blockId}`),
+};
+
+// ==============================
+// 代码执行 API
+// ==============================
+
+export interface CodeExecutionSaveData {
+  blockId: string;
+  documentId: string;
+  language?: string;
+  sourceCode: string;
+  status: string;
+  stdout?: string;
+  stderr?: string;
+  executionTimeMs?: number;
+}
+
+export interface CodeExecutionResponse {
+  id: string;
+  status: string;
+  stdout: string;
+  stderr: string;
+  resultJson: Record<string, unknown> | null;
+  executionTimeMs: number | null;
+  createdAt: string;
+}
+
+/**
+ * 代码执行 API
+ */
+export const codeExecutionAPI = {
+  /** 在后端 Docker 容器中执行代码 */
+  execute: (data: { blockId: string; documentId: string; language?: string; sourceCode: string }): Promise<CodeExecutionResponse> =>
+    post("/api/code-executions/execute", data),
+
+  /** 保存代码执行记录 */
+  save: (data: CodeExecutionSaveData): Promise<CodeExecutionResponse> =>
+    post("/api/code-executions", data),
+
+  /** 获取单条执行记录 */
+  get: (id: string): Promise<CodeExecutionResponse> =>
+    get(`/api/code-executions/${id}`),
+
+  /** 获取 block 的执行历史 */
+  getByBlock: (blockId: string, limit: number = 10): Promise<CodeExecutionResponse[]> =>
+    get(`/api/code-executions/by-block/${blockId}?limit=${limit}`),
 };

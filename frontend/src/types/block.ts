@@ -47,6 +47,7 @@ export interface CodeContent {
   language: string;
   code: string;
   output?: string;
+  stderr?: string;
   status?: 'idle' | 'running' | 'success' | 'error';
   executionTime?: string;
 }

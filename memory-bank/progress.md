@@ -489,6 +489,184 @@ npm run dev
 - `GET /api/blocks/{block_id}/whiteboard` — 获取白板数据
 - 数据库 `whiteboard_data` 表中应有对应的记录
 
+## 阶段 5：代码执行功能 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 5.1：实现前端 Pyodide 代码执行 ✅
+
+**修改的文件**:
+- `frontend/src/lib/codeRunner.ts` - Pyodide 代码执行器（新建）
+- `frontend/package.json` - 添加 pyodide 依赖
+
+**完成内容**:
+- 安装 pyodide npm 包
+- 创建 `codeRunner.ts`，封装 Pyodide 的懒加载和 Python 代码执行
+- 提供 `runPythonCode(code, timeoutMs)` 函数，返回 `CodeExecutionResult`（status, stdout, stderr, executionTimeMs）
+- 支持 stdout/stderr 捕获
+- 默认超时 5 秒，使用 Promise.race 实现
+- 全局单例缓存 Pyodide 实例，避免重复加载
+- 提供 `preloadPyodide()` 函数可选预加载
+- 错误处理：Pyodide 加载失败、执行超时、Python 运行时错误
+
+### 步骤 5.2：集成代码编辑器并对接执行功能 ✅
+
+**修改的文件**:
+- `frontend/src/components/editor/blocks/CodeBlock.tsx` - 重写代码块组件
+- `frontend/src/types/block.ts` - CodeContent 类型添加 stderr 字段
+- `frontend/package.json` - 添加 @monaco-editor/react 依赖
+
+**完成内容**:
+- 使用 Monaco Editor 替换原有 textarea，支持 Python 语法高亮
+- Monaco Editor 使用 dynamic import 避免 SSR 问题
+- 配置 Python 语法高亮、代码补全、行号显示
+- 自动调整编辑器高度适应代码内容
+- "运行"按钮调用真实 Pyodide 执行 Python 代码
+- stdout 输出以绿色文本展示，stderr 以红色文本展示
+- 执行时间显示
+- 代码变更时自动重置执行状态
+- 保留原有暗色主题（Catppuccin Mocha 风格）
+- 支持 Tab 键插入 4 个空格
+- 执行成功后自动保存执行记录到后端
+
+### 步骤 5.3：实现代码执行结果保存 ✅
+
+**修改的文件**:
+- `backend/app/services/code_execution_service.py` - 代码执行 Service 层（新建）
+- `backend/app/routers/code_execution.py` - 代码执行 API 路由（新建）
+- `backend/app/main.py` - 注册代码执行路由
+- `frontend/src/lib/api.ts` - 添加 codeExecutionAPI 函数
+
+**完成内容**:
+- 创建 `code_execution_service.py`，实现：
+  - `save_execution` — 保存代码执行记录
+  - `get_execution` — 获取单条执行记录
+  - `get_execution_history` — 获取指定 block 的执行历史
+- 创建 `code_execution.py` 路由：
+  - `POST /api/code-executions` — 保存代码执行记录
+  - `GET /api/code-executions/{execution_id}` — 获取执行记录
+  - `GET /api/code-executions/by-block/{block_id}` — 获取 block 的执行历史
+- 在 `main.py` 中注册代码执行路由
+- 前端 `api.ts` 添加 `codeExecutionAPI`（save, get, getByBlock）
+- CodeBlock 执行成功后异步保存记录到后端（不阻塞 UI）
+
+## 如何测试阶段 5
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证代码执行功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **创建代码块**: 使用斜杠命令 `/` 选择"Python 代码块"
+2. **Monaco Editor**: 代码块应显示 Monaco 编辑器，支持 Python 语法高亮
+3. **运行代码**: 点击"运行"按钮，首次运行会加载 Pyodide（约 10MB，需等待几秒）
+4. **查看输出**: stdout 以绿色显示，stderr 以红色显示
+5. **执行时间**: 输出面板右上角显示执行耗时
+6. **超时处理**: 运行 `import time; time.sleep(10)` 应在 5 秒后超时
+7. **代码变更**: 修改代码后，执行状态自动重置为"就绪"
+8. **自动保存**: 执行结果自动保存到后端数据库
+9. **刷新恢复**: 刷新页面后，代码内容从后端加载恢复
+
+### 4. 检查后端数据
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- `POST /api/code-executions` — 保存执行记录
+- `GET /api/code-executions/{execution_id}` — 获取执行记录
+- `GET /api/code-executions/by-block/{block_id}` — 获取执行历史
+- 数据库 `code_executions` 表中应有对应的记录
+
+## 代码执行方案变更：Pyodide → Docker 后端执行
+
+**完成时间**: 2026-05-15
+
+### 变更内容
+
+将代码执行从前端 Pyodide（WebAssembly）改为后端 Docker 容器执行。
+
+### 修改的文件
+
+**后端新增/修改**:
+- `backend/docker/python-runner/Dockerfile` — Python 执行环境镜像（新建）
+- `backend/app/services/docker_execution_service.py` — Docker 执行服务（新建）
+- `backend/app/routers/code_execution.py` — 添加 `POST /api/code-executions/execute` 执行端点
+- `backend/app/config.py` — 添加 Docker 配置项（DOCKER_IMAGE, DOCKER_MEMORY_LIMIT, DOCKER_CPU_LIMIT）
+- `backend/pyproject.toml` — 添加 docker SDK 依赖
+
+**前端修改**:
+- `frontend/src/components/editor/blocks/CodeBlock.tsx` — 改用后端 API 执行代码
+- `frontend/src/lib/api.ts` — 添加 `codeExecutionAPI.execute()` 方法
+- `frontend/package.json` — 移除 pyodide 依赖
+
+**前端删除**:
+- `frontend/src/lib/codeRunner.ts` — Pyodide 执行器（已删除）
+- `frontend/public/pyodide/` — Pyodide 静态资源（已删除）
+
+### 执行流程
+
+```
+前端 CodeBlock → POST /api/code-executions/execute → 后端 → Docker 容器执行 → 返回结果
+```
+
+### Docker 容器配置
+
+- 镜像: `aidoc-python-runner`（基于 python:3.11-slim）
+- 预装库: numpy, pandas, matplotlib, requests, scipy, scikit-learn, sympy, pillow, seaborn, plotly
+- 内存限制: 256MB
+- CPU 限制: 0.5 核
+- 网络: 禁用
+- 用户: 非 root
+
+## 如何测试代码执行功能
+
+### 1. 构建 Docker 镜像
+
+```bash
+cd backend/docker/python-runner
+docker build -t aidoc-python-runner .
+```
+
+### 2. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 3. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 4. 验证功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **创建代码块**: 使用斜杠命令 `/` 选择"Python 代码块"
+2. **运行代码**: 点击"运行"按钮，代码在后端 Docker 容器中执行
+3. **查看输出**: stdout 以绿色显示，stderr 以红色显示
+4. **执行时间**: 输出面板右上角显示执行耗时
+5. **预装库**: 可以 `import numpy`、`import pandas` 等，无需安装
+6. **网络隔离**: 容器内无法访问网络
+7. **超时处理**: 超过 30 秒的代码会被强制终止
+
 ## 下一步
 
-阶段 4 已完成，可以开始阶段 5（代码执行功能）或阶段 6（3D 图表功能）。
+阶段 5 已完成（代码执行已改为 Docker 后端执行），可以开始阶段 6（3D 图表功能）或阶段 7（AI 对话功能）。

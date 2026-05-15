@@ -203,6 +203,8 @@ export function DocumentEditor() {
   useEffect(() => {
     const handleUndo = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.key.toLowerCase() !== 'z') return;
+      // 焦点在 Monaco Editor 内时，让 Monaco 处理自己的撤销
+      if ((event.target as HTMLElement)?.closest?.('.monaco-editor')) return;
       if (!canUndo) return;
 
       event.preventDefault();

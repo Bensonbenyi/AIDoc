@@ -1,8 +1,16 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import { DocumentBlock } from '@/types/block';
-import { Play, Check, X, Loader2 } from 'lucide-react';
+import { Play, Check, X, Loader2, RotateCw } from 'lucide-react';
+import { codeExecutionAPI } from '@/lib/api';
+
+// Monaco Editor 使用 dynamic import 避免 SSR 问题
+const MonacoEditor = dynamic(
+  () => import(/* webpackChunkName: "monaco-editor" */ '@monaco-editor/react'),
+  { ssr: false }
+);
 
 interface Props {
   block: DocumentBlock;
@@ -12,42 +20,87 @@ interface Props {
 export function CodeBlock({ block, onUpdate }: Props) {
   const [code, setCode] = useState((block.content.code as string) || '');
   const [output, setOutput] = useState(block.content.output as string | undefined);
+  const [stderr, setStderr] = useState(block.content.stderr as string | undefined);
   const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>(
     (block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle'
   );
   const [execTime, setExecTime] = useState(block.content.executionTime as string | undefined);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // 当 block.content 从外部更新时同步本地状态
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
-    }
-  }, [code]);
+    setCode((block.content.code as string) || '');
+    setOutput(block.content.output as string | undefined);
+    setStderr(block.content.stderr as string | undefined);
+    setStatus((block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle');
+    setExecTime(block.content.executionTime as string | undefined);
+  }, [block.content]);
 
-  const runCode = () => {
+  const runCode = useCallback(async () => {
+    if (!code.trim()) return;
+
     setStatus('running');
     setOutput(undefined);
+    setStderr(undefined);
     setExecTime(undefined);
 
-    setTimeout(() => {
-      const success = Math.random() > 0.15;
-      const nextStatus = success ? 'success' : 'error';
-      const nextExecTime = success ? '耗时 0.23s' : '耗时 0.05s';
-      const nextOutput = success
-        ? '📊 月度增长数据：\n  月份  用户数  收入(万)\n   1月    1200       45\n   2月    1800       68\n   3月    2400       92\n   4月    3100      125\n   5月    4200      168\n   6月    5600      224\n\n📈 用户增长率: 366.7%'
-        : "Traceback (most recent call last):\n  File \"<stdin>\", line 5, in <module>\nModuleNotFoundError: No module named 'pandas'\n\n请确认已安装 pandas: pip install pandas";
+    try {
+      const result = await codeExecutionAPI.execute({
+        blockId: block.id,
+        documentId: block.documentId,
+        language: 'python',
+        sourceCode: code,
+      });
 
-      if (success) {
-        setStatus('success');
-      } else {
-        setStatus('error');
+      const timeStr = result.executionTimeMs
+        ? `${(result.executionTimeMs / 1000).toFixed(2)}s`
+        : undefined;
+
+      const resultStatus = result.status === 'timeout' ? 'error' : result.status as 'success' | 'error';
+
+      setStatus(resultStatus);
+      setOutput(result.stdout || undefined);
+      setStderr(result.stderr || undefined);
+      setExecTime(timeStr);
+
+      onUpdate({
+        ...block.content,
+        code,
+        output: result.stdout || '',
+        stderr: result.stderr || '',
+        status: resultStatus,
+        executionTime: timeStr || '',
+      });
+    } catch (err) {
+      setStatus('error');
+      const errorMsg = err instanceof Error ? err.message : '执行请求失败';
+      setStderr(errorMsg);
+      onUpdate({
+        ...block.content,
+        code,
+        output: '',
+        stderr: errorMsg,
+        status: 'error',
+        executionTime: '',
+      });
+    }
+  }, [code, block.content, block.id, block.documentId, onUpdate]);
+
+  const handleCodeChange = useCallback(
+    (value: string | undefined) => {
+      const newCode = value ?? '';
+      setCode(newCode);
+      // 代码变更时重置执行状态
+      if (status !== 'idle') {
+        setStatus('idle');
+        setOutput(undefined);
+        setStderr(undefined);
+        setExecTime(undefined);
       }
-      setOutput(nextOutput);
-      setExecTime(nextExecTime);
-      onUpdate({ ...block.content, code, output: nextOutput, status: nextStatus, executionTime: nextExecTime });
-    }, 1200 + Math.random() * 800);
-  };
+      // 同步更新 block content（不触发执行状态保存）
+      onUpdate({ ...block.content, code: newCode, status: 'idle', output: '', stderr: '', executionTime: '' });
+    },
+    [block.content, onUpdate, status]
+  );
 
   const statusConfig = {
     idle: { dot: 'bg-gray-400', text: '就绪', icon: null },
@@ -58,8 +111,31 @@ export function CodeBlock({ block, onUpdate }: Props) {
 
   const st = statusConfig[status];
 
+  // 按钮文字和样式
+  const getButtonContent = () => {
+    if (status === 'running') return <><Loader2 className="w-3 h-3 animate-spin" /> 运行中</>;
+    if (status === 'success') return <><Check className="w-3 h-3" /> 成功</>;
+    if (status === 'error') return <><RotateCw className="w-3 h-3" /> 重试</>;
+    return <><Play className="w-3 h-3" /> 运行</>;
+  };
+
+  const getButtonClass = () => {
+    if (status === 'running') return 'bg-yellow-500/20 text-yellow-400';
+    if (status === 'success') return 'bg-green-500/20 text-green-400 hover:bg-green-500/30';
+    if (status === 'error') return 'bg-red-500/20 text-red-400 hover:bg-red-500/30';
+    return 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30';
+  };
+
   return (
-    <div className="rounded-lg border border-border overflow-hidden bg-[#1e1e2e]">
+    <div
+      className="rounded-lg border border-border overflow-hidden bg-[#1e1e2e]"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDownCapture={(e) => {
+        // 让 Monaco Editor 自己处理所有键盘事件，阻止父级 SortableBlock 拦截
+        e.stopPropagation();
+      }}
+    >
+      {/* 工具栏 */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-[#181825] border-b border-white/5">
         <div className="flex items-center gap-2">
           <span className="text-xs text-[#cdd6f4] font-mono">Python</span>
@@ -70,60 +146,77 @@ export function CodeBlock({ block, onUpdate }: Props) {
         </div>
         <button
           onClick={runCode}
-          disabled={status === 'running'}
-          className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium transition-all ${
-            status === 'running'
-              ? 'bg-yellow-500/20 text-yellow-400'
-              : status === 'success'
-              ? 'bg-green-500/20 text-green-400'
-              : status === 'error'
-              ? 'bg-red-500/20 text-red-400'
-              : 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30'
-          }`}
+          disabled={status === 'running' || !code.trim()}
+          className={`flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-medium transition-all ${getButtonClass()}`}
         >
-          {status === 'running' ? (
-            <><Loader2 className="w-3 h-3 animate-spin" /> 运行中</>
-          ) : status === 'success' ? (
-            <><Check className="w-3 h-3" /> 成功</>
-          ) : status === 'error' ? (
-            <><X className="w-3 h-3" /> 失败</>
-          ) : (
-            <><Play className="w-3 h-3" /> 运行</>
-          )}
+          {getButtonContent()}
         </button>
       </div>
-      <textarea
-        ref={textareaRef}
-        data-editor-focus-target="true"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        spellCheck={false}
-        className="w-full bg-transparent text-[#cdd6f4] font-mono text-sm p-3 outline-none resize-none min-h-[80px]"
-        onKeyDown={(e) => {
-          if (e.key === 'Tab') {
-            e.preventDefault();
-            const s = e.currentTarget.selectionStart;
-            const end = e.currentTarget.selectionEnd;
-            setCode(code.substring(0, s) + '    ' + code.substring(end));
-            setTimeout(() => {
-              if (textareaRef.current) textareaRef.current.selectionStart = textareaRef.current.selectionEnd = s + 4;
-            }, 0);
-          }
-        }}
-      />
-      {(output || status === 'running') && (
+
+      {/* Monaco Editor */}
+      <div className="min-h-[120px]">
+        <MonacoEditor
+          height="120px"
+          language="python"
+          theme="vs-dark"
+          value={code}
+          onChange={handleCodeChange}
+          options={{
+            minimap: { enabled: false },
+            fontSize: 13,
+            fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+            lineNumbers: 'on',
+            scrollBeyondLastLine: false,
+            wordWrap: 'on',
+            tabSize: 4,
+            insertSpaces: true,
+            automaticLayout: true,
+            padding: { top: 8, bottom: 8 },
+            renderLineHighlight: 'none',
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            scrollbar: {
+              vertical: 'hidden',
+              horizontal: 'auto',
+              verticalScrollbarSize: 0,
+            },
+            lineDecorationsWidth: 0,
+            lineNumbersMinChars: 3,
+          }}
+          onMount={(editor) => {
+            // 自动调整高度：监听内容变化
+            const updateHeight = () => {
+              const contentHeight = Math.max(120, editor.getContentHeight() + 16);
+              const domNode = editor.getDomNode();
+              if (domNode) {
+                domNode.style.height = `${contentHeight}px`;
+              }
+              editor.layout();
+            };
+            editor.onDidContentSizeChange(updateHeight);
+            updateHeight();
+          }}
+        />
+      </div>
+
+      {/* 输出面板 */}
+      {(output || stderr || status === 'running') && (
         <div className="border-t border-white/5">
           <div className="flex items-center justify-between px-3 py-1 bg-[#11111b]">
             <span className="text-xs text-[#a6adc8]">Output</span>
             {execTime && <span className="text-xs text-[#6c7086]">{execTime}</span>}
           </div>
-          <pre
-            className={`px-3 py-2 text-xs font-mono whitespace-pre-wrap ${
-              status === 'error' ? 'text-[#f38ba8]' : 'text-[#a6e3a1]'
-            }`}
-          >
-            {output || (status === 'running' ? '执行中...' : '')}
-          </pre>
+          <div className="px-3 py-2 text-xs font-mono whitespace-pre-wrap max-h-[200px] overflow-auto">
+            {output && (
+              <pre className="text-[#a6e3a1]">{output}</pre>
+            )}
+            {stderr && (
+              <pre className="text-[#f38ba8]">{stderr}</pre>
+            )}
+            {status === 'running' && !output && !stderr && (
+              <span className="text-[#a6adc8]">执行中...</span>
+            )}
+          </div>
         </div>
       )}
     </div>

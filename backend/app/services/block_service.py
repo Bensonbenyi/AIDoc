@@ -54,41 +54,63 @@ async def create_block(
 async def batch_save_blocks(
     db: AsyncSession, document_id: uuid.UUID, blocks: list[BlockCreate]
 ) -> int:
-    """批量保存 blocks（删除旧的，插入新的）"""
+    """批量保存 blocks（保留已有 ID，删除多余的旧 block）"""
     # 验证文档存在
     doc = await db.get(Document, document_id)
     if not doc or doc.is_deleted:
         raise ValueError("文档不存在")
 
-    # 删除该文档下所有现有的关联数据（白板、图表）
+    # 收集新列表中要保留的 block ID
+    preserved_ids: set[uuid.UUID] = set()
+    for b in blocks:
+        if b.id is not None:
+            preserved_ids.add(b.id)
+
+    # 查找该文档下所有现有 block ID
     old_block_ids_stmt = select(DocumentBlock.id).where(
         DocumentBlock.document_id == document_id
     )
     old_block_ids_result = await db.execute(old_block_ids_stmt)
     old_block_ids = [row[0] for row in old_block_ids_result.all()]
 
-    if old_block_ids:
+    # 找出需要删除的 block（不在保留列表中的）
+    ids_to_delete = [bid for bid in old_block_ids if bid not in preserved_ids]
+
+    if ids_to_delete:
+        # 删除要丢弃的 block 的关联数据
         await db.execute(
-            delete(WhiteboardData).where(WhiteboardData.block_id.in_(old_block_ids))
+            delete(WhiteboardData).where(WhiteboardData.block_id.in_(ids_to_delete))
         )
         await db.execute(
-            delete(Chart3D).where(Chart3D.block_id.in_(old_block_ids))
+            delete(Chart3D).where(Chart3D.block_id.in_(ids_to_delete))
+        )
+        # 删除旧 block
+        await db.execute(
+            delete(DocumentBlock).where(DocumentBlock.id.in_(ids_to_delete))
         )
 
-    # 删除该文档下所有现有 block
-    await db.execute(
-        delete(DocumentBlock).where(DocumentBlock.document_id == document_id)
-    )
-
-    # 批量插入新的 block
+    # 创建或更新 block
     for block_data in blocks:
         block_type = (
             block_data.block_type.value
             if hasattr(block_data.block_type, "value")
             else block_data.block_type
         )
+
+        if block_data.id is not None and block_data.id in preserved_ids:
+            # 检查 block 是否已存在于数据库
+            existing = await db.get(DocumentBlock, block_data.id)
+            if existing:
+                # 更新已有 block
+                existing.block_type = block_type
+                existing.content = block_data.content
+                existing.properties = block_data.properties
+                existing.sort_order = block_data.sort_order
+                continue
+
+        # 创建新 block
         block = DocumentBlock(
-            id=uuid.uuid4(),
+            id=block_data.id if block_data.id is not None else uuid.uuid4(),
             document_id=document_id,
             block_type=block_type,
             content=block_data.content,
