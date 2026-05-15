@@ -59,9 +59,19 @@ async def init_db() -> None:
     """
     async with engine.begin() as conn:
         # 导入所有模型，确保它们被注册到 Base.metadata
-        from app.models import document, document_block, whiteboard_data, chart_3d
-        from app.models import ai_chat, ai_message, knowledge_chunk, document_summary
-        from app.models import code_execution, file_asset, system_log
+        from app.models import (  # noqa: F401
+            document,
+            document_block,
+            whiteboard_data,
+            chart_3d,
+            ai_chat,
+            ai_message,
+            knowledge_chunk,
+            document_summary,
+            code_execution,
+            file_asset,
+            system_log,
+        )
 
         # 创建所有表
         await conn.run_sync(Base.metadata.create_all)

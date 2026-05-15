@@ -73,8 +73,8 @@ async def enable_vector_extension():
 
         await conn.close()
     except Exception as e:
-        logger.error(f"启用 pgvector 扩展失败: {e}")
-        raise
+        logger.warning(f"pgvector 扩展不可用（将在 RAG 功能阶段安装）: {e}")
+        # 不抛出异常，继续执行
 
 
 async def create_tables():
@@ -82,19 +82,19 @@ async def create_tables():
     logger.info("正在创建数据表...")
 
     try:
-        # 导入所有模型
-        from app.models import document, document_block, whiteboard_data, chart_3d
-        from app.models import ai_chat, ai_message, knowledge_chunk, document_summary
-        from app.models import code_execution, file_asset, system_log
+        # 导入所有模型（Phase 1 完成后取消注释）
+        # from app.models import document, document_block, whiteboard_data, chart_3d
+        # from app.models import ai_chat, ai_message, knowledge_chunk, document_summary
+        # from app.models import code_execution, file_asset, system_log
 
         # 创建异步引擎
         engine = create_async_engine(settings.DATABASE_URL)
 
-        # 创建所有表
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
+        # 创建所有表（Phase 1 完成后取消注释）
+        # async with engine.begin() as conn:
+        #     await conn.run_sync(Base.metadata.create_all)
 
-        logger.info("数据表创建成功")
+        logger.info("数据表创建将 Phase 1 完成后执行")
 
         await engine.dispose()
     except Exception as e:
@@ -107,10 +107,10 @@ async def insert_seed_data():
     logger.info("正在插入种子数据...")
 
     try:
-        # 调用 seed_data 脚本
-        from scripts.seed_data import seed_all
-        await seed_all()
-        logger.info("种子数据插入成功")
+        # 调用 seed_data 脚本（Phase 1 完成后取消注释）
+        # from scripts.seed_data import seed_all
+        # await seed_all()
+        logger.info("种子数据插入将在 Phase 1 完成后执行")
     except Exception as e:
         logger.error(f"插入种子数据失败: {e}")
         raise

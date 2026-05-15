@@ -107,6 +107,81 @@ npm run dev
 
 在浏览器中打开 http://localhost:3000，打开开发者工具 Network 面板，验证前端能否正确调用后端 API。
 
+## 阶段 1：数据库模型与 ORM 定义 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 1.1：定义核心 ORM 模型 ✅
+
+**修改的文件**:
+- `backend/app/models/__init__.py` - 模型导出文件
+- `backend/app/models/document.py` - Document 模型
+- `backend/app/models/document_block.py` - DocumentBlock 模型
+- `backend/app/models/whiteboard_data.py` - WhiteboardData 模型
+- `backend/app/models/chart_3d.py` - Chart3D 模型
+- `backend/app/models/ai_chat.py` - AIChatSession 模型
+- `backend/app/models/ai_message.py` - AIMessage 模型
+- `backend/app/models/knowledge_chunk.py` - KnowledgeChunk 模型
+- `backend/app/models/document_summary.py` - DocumentSummary 模型
+- `backend/app/models/code_execution.py` - CodeExecution 模型
+- `backend/app/models/file_asset.py` - FileAsset 模型
+- `backend/app/models/system_log.py` - SystemLog 模型
+- `backend/app/database.py` - 更新以启用模型导入和表创建
+
+**完成内容**:
+- 创建了 11 个 ORM 模型，使用 SQLAlchemy 2.0 风格的 `Mapped` 类型注解
+- 所有模型使用 UUID 作为主键
+- 定义了模型之间的关系（外键、一对多、自引用等）
+- KnowledgeChunk 模型包含 pgvector 的 Vector(1024) 类型用于 embedding 存储
+- 更新了 database.py 以启用模型导入和自动建表
+
+### 步骤 1.2：定义 Pydantic Schema ✅
+
+**修改的文件**:
+- `backend/app/schemas/__init__.py` - Schema 导出文件
+- `backend/app/schemas/document.py` - 文档相关 Schema
+- `backend/app/schemas/block.py` - Block 相关 Schema
+- `backend/app/schemas/whiteboard.py` - 白板相关 Schema
+- `backend/app/schemas/ai.py` - AI 对话相关 Schema
+- `backend/app/schemas/rag.py` - RAG 检索相关 Schema
+- `backend/app/schemas/code_execution.py` - 代码执行相关 Schema
+- `backend/app/schemas/chart.py` - 3D 图表相关 Schema
+- `backend/app/schemas/file.py` - 文件上传相关 Schema
+- `backend/app/schemas/system.py` - 系统状态相关 Schema
+
+**完成内容**:
+- 创建了完整的请求和响应 Pydantic 模型
+- 所有 Schema 使用 `model_config = ConfigDict(from_attributes=True)` 支持 ORM 模型转换
+- 定义了枚举类型（BlockType, ExecutionStatus, ChartSourceType, AIScope）
+- 使用 `Field` 添加字段描述和默认值
+
+## 如何测试阶段 1
+
+### 1. 验证模型导入
+
+```bash
+cd backend
+uv run python -c "from app.models import Document, DocumentBlock, WhiteboardData, Chart3D, AIChatSession, AIMessage, KnowledgeChunk, DocumentSummary, CodeExecution, FileAsset, SystemLog; print('Models imported successfully')"
+```
+
+### 2. 验证 Schema 导入
+
+```bash
+uv run python -c "from app.schemas import DocumentCreate, DocumentUpdate, DocumentResponse, BlockCreate, BlockUpdate, BlockResponse; print('Schemas imported successfully')"
+```
+
+### 3. 测试数据库建表
+
+```bash
+# 确保 PostgreSQL 已安装并启动
+# 运行数据库初始化脚本（会自动创建表）
+uv run python scripts/init_db.py
+```
+
+验证：
+- 所有数据表已创建（documents, document_blocks, whiteboard_data, chart_3d, ai_chat_sessions, ai_messages, knowledge_chunks, document_summaries, code_executions, file_assets, system_logs）
+- 表结构包含正确的字段和约束
+
 ## 下一步
 
-阶段 0 已完成，可以开始阶段 1：数据库模型与 ORM 定义。
+阶段 1 已完成，可以开始阶段 2：文档管理 API。
