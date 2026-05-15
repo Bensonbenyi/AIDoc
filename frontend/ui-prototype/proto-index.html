@@ -1,0 +1,644 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DocAI — AI 原生交互式文档系统</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-warm: #f6f5f4;
+  --bg-sidebar: #fbfaf9;
+  --surface: #ffffff;
+  --fg: rgba(0,0,0,0.92);
+  --fg-secondary: #615d59;
+  --fg-muted: #a39e98;
+  --border: rgba(0,0,0,0.1);
+  --border-light: rgba(0,0,0,0.06);
+  --accent: #6366f1;
+  --accent-light: #818cf8;
+  --accent-lighter: #c7d2fe;
+  --accent-bg: #eef2ff;
+  --accent-gradient: linear-gradient(135deg, #6366f1, #8b5cf6);
+  --success: #10b981;
+  --success-bg: #ecfdf5;
+  --error: #ef4444;
+  --error-bg: #fef2f2;
+  --warning: #f59e0b;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.06);
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', ui-monospace, Menlo, monospace;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Noto Sans SC', system-ui, sans-serif;
+  --sidebar-w: 260px;
+  --ai-w: 360px;
+  --editor-max: 720px;
+  --ease: cubic-bezier(0.16,1,0.3,1);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:var(--font-sans);font-size:14px;line-height:1.5;color:var(--fg);background:var(--bg);-webkit-font-smoothing:antialiased;overflow:hidden}
+::selection{background:var(--accent-lighter)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.08);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,0.15)}
+
+/* ===== APP SHELL ===== */
+.app{display:flex;height:100vh;overflow:hidden}
+
+/* ===== LEFT SIDEBAR ===== */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg-sidebar);border-right:1px solid var(--border-light);display:flex;flex-direction:column;transition:all .3s var(--ease);overflow:hidden;z-index:20}
+.sidebar.collapsed{width:0;min-width:0;border-right:none}
+.sidebar-header{padding:16px 16px 12px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sidebar-logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px;color:var(--fg);letter-spacing:-.01em}
+.sidebar-logo-icon{width:24px;height:24px;background:var(--accent-gradient);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+.sidebar-actions{margin-left:auto;display:flex;gap:2px}
+.sidebar-btn{width:28px;height:28px;border:none;background:0 0;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-secondary);font-size:16px;transition:all .15s}
+.sidebar-btn:hover{background:rgba(0,0,0,.05);color:var(--fg)}
+.sidebar-section-label{padding:12px 16px 4px;font-size:11px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}
+.sidebar-tree{flex:1;overflow-y:auto;padding:4px 8px}
+.tree-node-row{display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:var(--radius-sm);cursor:pointer;transition:background .1s;min-height:30px}
+.tree-node-row:hover{background:rgba(0,0,0,.04)}
+.tree-node-row.active{background:var(--accent-bg)}
+.tree-node-row.active .tree-node-title{color:var(--accent);font-weight:500}
+.tree-toggle{width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:3px;flex-shrink:0;color:var(--fg-muted);font-size:10px;transition:transform .2s var(--ease)}
+.tree-toggle.open{transform:rotate(90deg)}
+.tree-toggle.leaf{visibility:hidden}
+.tree-icon{font-size:16px;flex-shrink:0;width:20px;text-align:center}
+.tree-title{font-size:13px;color:var(--fg-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.tree-add{opacity:0;width:20px;height:20px;border:none;background:0 0;border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:14px;flex-shrink:0;transition:all .15s}
+.tree-node-row:hover .tree-add{opacity:1}
+.tree-add:hover{background:rgba(0,0,0,.08);color:var(--fg)}
+.tree-children{padding-left:16px;overflow:hidden;transition:max-height .3s var(--ease)}
+.tree-children.collapsed{max-height:0!important}
+
+/* ===== MAIN ===== */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:44px;display:flex;align-items:center;padding:0 16px;border-bottom:1px solid var(--border-light);flex-shrink:0;gap:8px;background:var(--bg);z-index:10}
+.topbar-toggle{width:32px;height:32px;border:none;background:0 0;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-secondary);font-size:18px;transition:all .15s}
+.topbar-toggle:hover{background:rgba(0,0,0,.05);color:var(--fg)}
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--fg-muted)}
+.breadcrumb-sep{opacity:.5}
+.breadcrumb-item{cursor:pointer;transition:color .15s}
+.breadcrumb-item:hover{color:var(--fg)}
+.breadcrumb-item.current{color:var(--fg-secondary);font-weight:500}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.topbar-ai-btn{display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--accent-lighter);background:var(--accent-bg);border-radius:9999px;cursor:pointer;font-size:13px;font-weight:500;color:var(--accent);font-family:var(--font-sans);transition:all .2s}
+.topbar-ai-btn:hover{background:var(--accent-lighter);border-color:var(--accent-light)}
+.ai-dot{width:6px;height:6px;background:var(--accent-gradient);border-radius:50%;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+
+.editor-scroll{flex:1;overflow-y:auto;overflow-x:hidden}
+.editor{max-width:var(--editor-max);margin:0 auto;padding:48px 24px 240px}
+
+/* ===== DOC HEADER ===== */
+.doc-header{margin-bottom:32px}
+.doc-icon{font-size:48px;margin-bottom:16px;cursor:pointer;width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-md);transition:background .15s}
+.doc-icon:hover{background:rgba(0,0,0,.04)}
+.doc-title{font-family:var(--font-display);font-size:40px;font-weight:700;line-height:1.1;letter-spacing:-.02em;color:var(--fg);border:none;outline:none;width:100%;background:0 0;resize:none;overflow:hidden}
+.doc-title:empty::before{content:attr(data-placeholder);color:var(--fg-muted)}
+.doc-desc{margin-top:12px;font-size:16px;color:var(--fg-secondary);line-height:1.5}
+
+/* ===== BLOCKS ===== */
+.block{position:relative;margin-bottom:4px;border-radius:var(--radius-sm);transition:background .1s}
+.block:hover>.block-handle{opacity:1}
+.block-handle{position:absolute;left:-40px;top:2px;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.block-handle-btn{width:24px;height:24px;border:none;background:0 0;border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-muted);font-size:14px}
+.block-handle-btn:hover{background:rgba(0,0,0,.06);color:var(--fg-secondary)}
+.block-content{padding:3px 0}
+.block-text{font-size:15px;line-height:1.65;color:var(--fg)}
+.block-text:empty::before{content:"输入文字，或按 / 插入内容块…";color:var(--fg-muted)}
+.block-h1{font-family:var(--font-display);font-size:30px;font-weight:700;line-height:1.2;letter-spacing:-.015em;margin-top:32px;margin-bottom:8px}
+.block-h1:first-child{margin-top:0}
+.block-h2{font-family:var(--font-display);font-size:24px;font-weight:600;line-height:1.3;letter-spacing:-.01em;margin-top:24px;margin-bottom:8px}
+.block-h3{font-family:var(--font-display);font-size:20px;font-weight:600;line-height:1.4;margin-top:20px;margin-bottom:4px}
+.block-list{padding-left:24px}
+.block-list li{font-size:15px;line-height:1.65;margin-bottom:4px}
+.block-list li::marker{color:var(--fg-muted)}
+.block-quote{border-left:3px solid var(--accent);padding-left:16px;font-size:15px;line-height:1.65;color:var(--fg-secondary);font-style:italic}
+.block-divider{height:1px;background:var(--border);margin:20px 0}
+
+/* Todo */
+.block-todo{display:flex;align-items:flex-start;gap:12px;padding:4px 0;cursor:pointer}
+.todo-cb{width:18px;height:18px;border:2px solid var(--border);border-radius:var(--radius-sm);flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;transition:all .15s;background:var(--bg);font-size:11px;color:transparent}
+.todo-cb.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.todo-text{font-size:15px;line-height:1.5}
+.todo-text.done{text-decoration:line-through;color:var(--fg-muted)}
+
+/* Table */
+.table-wrap{border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin:12px 0}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th{background:var(--bg-warm);font-weight:600;text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border-light);font-size:13px;color:var(--fg-secondary)}
+.table th:last-child{border-right:none}
+.table td{padding:8px 12px;border-bottom:1px solid var(--border-light);border-right:1px solid var(--border-light)}
+.table td:last-child,.table tr:last-child td{border-right:none;border-bottom:none}
+.table td[contenteditable]:focus,.table th[contenteditable]:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--accent-bg)}
+.table-actions{display:flex;gap:8px;margin-top:8px}
+.table-action-btn{display:flex;align-items:center;gap:4px;padding:4px 10px;border:1px solid var(--border);background:var(--bg);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--fg-secondary);font-family:var(--font-sans);transition:all .15s}
+.table-action-btn:hover{border-color:var(--accent-lighter);color:var(--accent);background:var(--accent-bg)}
+
+/* Doc link */
+.doc-link{display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--border-light);border-radius:var(--radius-md);cursor:pointer;transition:all .15s;margin:8px 0;background:var(--bg)}
+.doc-link:hover{background:var(--bg-warm);border-color:var(--border)}
+.doc-link-icon{font-size:18px}
+.doc-link-title{font-size:14px;font-weight:500;color:var(--fg)}
+.doc-link-arrow{margin-left:auto;color:var(--fg-muted);font-size:12px}
+
+/* ===== WHITEBOARD ===== */
+.wb{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0;background:var(--bg);box-shadow:var(--shadow-card)}
+.wb-header{display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border-light);background:var(--bg-warm)}
+.wb-title{font-size:13px;font-weight:600;color:var(--fg-secondary);display:flex;align-items:center;gap:8px}
+.wb-tools{display:flex;gap:4px;margin-left:auto}
+.wb-tool{width:30px;height:30px;border:1px solid transparent;background:0 0;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-secondary);font-size:15px;transition:all .15s}
+.wb-tool:hover{background:rgba(0,0,0,.05)}
+.wb-tool.active{background:var(--accent-bg);color:var(--accent);border-color:var(--accent-lighter)}
+.wb-canvas-wrap{position:relative;height:300px;cursor:crosshair;background:#fefefe;background-image:radial-gradient(circle,#e5e5e5 1px,transparent 1px);background-size:20px 20px}
+.wb-canvas-wrap canvas{display:block;width:100%;height:100%}
+.wb-expand{position:absolute;top:8px;right:8px;width:28px;height:28px;border:1px solid var(--border);background:var(--bg);border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--fg-secondary);font-size:12px;opacity:0;transition:opacity .15s}
+.wb:hover .wb-expand{opacity:1}
+
+/* Whiteboard overlay */
+.wb-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;display:none;align-items:center;justify-content:center;padding:32px;animation:fadein .2s}
+.wb-overlay.on{display:flex}
+.wb-expanded{width:100%;max-width:1000px;height:80vh;background:var(--bg);border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-lg);display:flex;flex-direction:column}
+.wb-expanded .wb-canvas-wrap{flex:1;height:auto}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* ===== CODE BLOCK ===== */
+.code-block{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0;box-shadow:var(--shadow-card)}
+.code-hdr{display:flex;align-items:center;padding:8px 16px;background:#1e1e2e;gap:12px}
+.code-lang{font-size:12px;font-weight:600;color:#cdd6f4;font-family:var(--font-mono)}
+.code-status{font-size:11px;font-family:var(--font-mono);display:flex;align-items:center;gap:4px;margin-left:auto}
+.code-status-dot{width:6px;height:6px;border-radius:50%;background:var(--fg-muted)}
+.code-status.running .code-status-dot{background:var(--warning);animation:pulse 1s infinite}
+.code-status.success .code-status-dot{background:var(--success)}
+.code-status.error .code-status-dot{background:var(--error)}
+.code-status.running{color:#fbbf24}
+.code-status.success{color:#34d399}
+.code-status.error{color:#f87171}
+.code-run{margin-left:12px;display:flex;align-items:center;gap:4px;padding:4px 12px;border:none;background:rgba(255,255,255,.1);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;font-weight:500;color:#cdd6f4;font-family:var(--font-mono);transition:all .15s}
+.code-run:hover{background:rgba(255,255,255,.2)}
+.code-run.running{background:rgba(245,158,11,.2);color:#fbbf24}
+.code-run.ok{background:rgba(16,185,129,.2);color:#34d399}
+.code-run.err{background:rgba(239,68,68,.2);color:#f87171}
+.code-editor{background:#1e1e2e;padding:16px;font-family:var(--font-mono);font-size:13px;line-height:1.6;color:#cdd6f4;position:relative}
+.code-editor textarea{width:100%;min-height:80px;background:0 0;border:none;outline:none;color:#cdd6f4;font-family:var(--font-mono);font-size:13px;line-height:1.6;resize:vertical;tab-size:4}
+.code-editor textarea::placeholder{color:#585b70}
+.code-output{border-top:1px solid var(--border-light);background:var(--bg-warm);display:none}
+.code-output-hdr{display:flex;align-items:center;padding:8px 16px;font-size:11px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em;gap:8px}
+.code-output-time{margin-left:auto;font-weight:400;text-transform:none;letter-spacing:normal}
+.code-output-body{padding:0 16px 12px;font-family:var(--font-mono);font-size:13px;line-height:1.5;color:var(--fg);white-space:pre-wrap}
+.code-output-body.err{color:var(--error)}
+.code-chart-btn{display:flex;gap:8px;padding:8px 16px;border-top:1px solid var(--border-light);background:var(--bg-warm)}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(245,158,11,.3);border-top-color:var(--warning);border-radius:50%;animation:spin .6s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== 3D CHART ===== */
+.chart-block{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0;box-shadow:var(--shadow-card);background:var(--bg)}
+.chart-hdr{display:flex;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border-light);gap:12px}
+.chart-title{font-size:14px;font-weight:600;color:var(--fg);display:flex;align-items:center;gap:8px}
+.chart-source{font-size:12px;color:var(--fg-muted);margin-left:auto}
+.chart-canvas{height:320px;perspective:800px;display:flex;align-items:flex-end;justify-content:center;background:linear-gradient(180deg,#fafbff,#f0f0ff);overflow:hidden;position:relative;cursor:grab;padding:40px 40px 20px;gap:20px}
+.chart-canvas:active{cursor:grabbing}
+.chart-bar{transform-style:preserve-3d;position:relative;width:44px;transition:height .8s var(--ease)}
+.chart-bar-front{position:absolute;bottom:0;width:44px;border-radius:3px 3px 0 0;background:linear-gradient(180deg,#818cf8,#6366f1);opacity:.92}
+.chart-bar-side{position:absolute;bottom:0;width:14px;background:linear-gradient(180deg,#6366f1,#4f46e5);transform:skewY(-20deg);transform-origin:bottom right;right:-14px;border-radius:0 3px 0 0;opacity:.65}
+.chart-bar-top{position:absolute;top:0;width:44px;height:14px;background:linear-gradient(135deg,#a5b4fc,#818cf8);transform:skewX(-40deg);transform-origin:bottom left;border-radius:3px}
+.chart-labels{display:flex;justify-content:center;gap:20px;padding:8px 40px;border-top:1px solid var(--border-light)}
+.chart-label{font-size:11px;color:var(--fg-muted);width:44px;text-align:center}
+.chart-footer{display:flex;gap:8px;padding:8px 16px;border-top:1px solid var(--border-light)}
+
+/* ===== AI RESPONSE BLOCK ===== */
+.ai-block{border:1px solid var(--accent-lighter);border-radius:var(--radius-lg);overflow:hidden;margin:16px 0;background:var(--accent-bg)}
+.ai-block-hdr{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--accent-lighter);font-size:13px;font-weight:600;color:var(--accent)}
+.ai-block-body{padding:16px;font-size:14px;line-height:1.65;color:var(--fg)}
+
+/* ===== SLASH MENU ===== */
+.slash-menu{position:fixed;width:280px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);z-index:50;display:none;overflow:hidden;animation:menuin .15s var(--ease)}
+.slash-menu.on{display:block}
+@keyframes menuin{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.slash-search{padding:12px;border-bottom:1px solid var(--border-light)}
+.slash-search input{width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:13px;outline:none;font-family:var(--font-sans);background:var(--bg-warm)}
+.slash-search input:focus{border-color:var(--accent);background:var(--bg)}
+.slash-list{max-height:320px;overflow-y:auto;padding:4px}
+.slash-section{padding:8px 12px 4px;font-size:11px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em}
+.slash-item{display:flex;align-items:center;gap:12px;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:background .1s}
+.slash-item:hover,.slash-item.hl{background:var(--accent-bg)}
+.slash-item-icon{width:32px;height:32px;border:1px solid var(--border);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:16px;background:var(--bg);flex-shrink:0}
+.slash-item-name{font-size:13px;font-weight:500;color:var(--fg)}
+.slash-item-desc{font-size:11px;color:var(--fg-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ===== AI SIDEBAR ===== */
+.ai-sidebar{width:var(--ai-w);min-width:var(--ai-w);background:var(--bg);border-left:1px solid var(--border-light);display:flex;flex-direction:column;transition:all .3s var(--ease);overflow:hidden;z-index:20}
+.ai-sidebar.collapsed{width:0;min-width:0;border-left:none}
+.ai-hdr{padding:16px;border-bottom:1px solid var(--border-light);flex-shrink:0}
+.ai-hdr-title{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--fg);margin-bottom:12px}
+.ai-icon{width:24px;height:24px;background:var(--accent-gradient);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px}
+.ai-scope{display:flex;gap:4px}
+.ai-scope-btn{padding:4px 10px;border:1px solid var(--border);background:var(--bg);border-radius:9999px;cursor:pointer;font-size:12px;color:var(--fg-secondary);font-family:var(--font-sans);transition:all .15s}
+.ai-scope-btn:hover{border-color:var(--accent-lighter);color:var(--accent)}
+.ai-scope-btn.active{background:var(--accent-bg);border-color:var(--accent-lighter);color:var(--accent);font-weight:500}
+.ai-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:16px}
+.ai-msg{display:flex;gap:12px;animation:msgin .3s var(--ease)}
+@keyframes msgin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.ai-avatar{width:28px;height:28px;border-radius:var(--radius-sm);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:14px}
+.ai-avatar.user{background:var(--bg-warm);color:var(--fg-secondary)}
+.ai-avatar.bot{background:var(--accent-gradient);color:#fff;font-size:12px}
+.ai-msg-body{flex:1;min-width:0}
+.ai-msg-name{font-size:12px;font-weight:600;color:var(--fg);margin-bottom:4px}
+.ai-msg-text{font-size:14px;line-height:1.6;color:var(--fg)}
+.ai-msg-text p{margin-bottom:8px}
+.ai-msg-text p:last-child{margin-bottom:0}
+.ai-citations{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)}
+.ai-citations-label{font-size:11px;font-weight:600;color:var(--fg-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px}
+.ai-cite{display:flex;align-items:center;gap:8px;padding:4px 8px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--accent);transition:background .1s}
+.ai-cite:hover{background:var(--accent-bg)}
+.ai-cite-num{font-weight:600;font-size:11px;background:var(--accent-bg);border-radius:2px;padding:1px 4px}
+.ai-retrieval{margin-top:8px;padding:8px 12px;background:var(--bg-warm);border-radius:var(--radius-sm);font-size:11px;color:var(--fg-muted);display:flex;align-items:center;gap:8px}
+.ai-loading{display:flex;gap:4px;padding:8px 0}
+.ai-loading span{width:6px;height:6px;background:var(--accent-lighter);border-radius:50%;animation:ldot 1.2s infinite}
+.ai-loading span:nth-child(2){animation-delay:.2s}
+.ai-loading span:nth-child(3){animation-delay:.4s}
+@keyframes ldot{0%,80%,100%{opacity:.3;transform:scale(.8)}40%{opacity:1;transform:scale(1)}}
+.ai-input-area{padding:16px;border-top:1px solid var(--border-light);flex-shrink:0}
+.ai-input-wrap{display:flex;align-items:flex-end;gap:8px;border:1px solid var(--border);border-radius:var(--radius-lg);padding:8px 12px;background:var(--bg-warm);transition:all .15s}
+.ai-input-wrap:focus-within{border-color:var(--accent);background:var(--bg);box-shadow:0 0 0 3px var(--accent-bg)}
+.ai-input{flex:1;border:none;outline:none;font-size:14px;font-family:var(--font-sans);color:var(--fg);background:0 0;resize:none;min-height:20px;max-height:100px;line-height:1.4}
+.ai-input::placeholder{color:var(--fg-muted)}
+.ai-send{width:32px;height:32px;border:none;background:var(--accent-gradient);border-radius:var(--radius-md);cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;flex-shrink:0;transition:transform .1s,opacity .15s;opacity:.4}
+.ai-send.active{opacity:1}
+.ai-send:active{transform:scale(.9)}
+
+/* Block highlight */
+.block-highlight{animation:blockflash 1.5s ease-out}
+@keyframes blockflash{0%{background:var(--accent-bg);box-shadow:inset 3px 0 0 var(--accent)}100%{background:transparent;box-shadow:inset 3px 0 0 transparent}}
+
+/* Typewriter */
+.tw-cursor{display:inline-block;width:2px;height:1em;background:var(--accent);margin-left:1px;animation:blink .8s step-end infinite;vertical-align:text-bottom}
+@keyframes blink{50%{opacity:0}}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+<!-- LEFT SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo"><div class="sidebar-logo-icon">D</div><span>DocAI</span></div>
+    <div class="sidebar-actions"><button class="sidebar-btn" title="收起侧边栏" onclick="toggleSidebar()">«</button></div>
+  </div>
+  <div class="sidebar-section-label">文档空间</div>
+  <div class="sidebar-tree" id="tree"></div>
+  <div style="padding:12px 16px;border-top:1px solid var(--border-light)">
+    <button style="width:100%;display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px dashed var(--border);background:0 0;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;color:var(--fg-muted);font-family:var(--font-sans);transition:all .15s" onmouseover="this.style.borderColor='var(--accent)';this.style.color='var(--accent)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--fg-muted)'" onclick="addNewDoc()">+ 新建文档</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <button class="topbar-toggle" onclick="toggleSidebar()">☰</button>
+    <div class="breadcrumb" id="bc"><span class="breadcrumb-item">默认文档空间</span><span class="breadcrumb-sep">/</span><span class="breadcrumb-item current" id="bcCur">产品设计</span></div>
+    <div class="topbar-right"><button class="topbar-ai-btn" onclick="toggleAI()"><span class="ai-dot"></span>AI 助手</button></div>
+  </div>
+  <div class="editor-scroll"><div class="editor" id="editor"></div></div>
+</main>
+
+<!-- AI SIDEBAR -->
+<aside class="ai-sidebar" id="aiSidebar">
+  <div class="ai-hdr">
+    <div class="ai-hdr-title"><span class="ai-icon">✦</span>AI Assistant</div>
+    <div class="ai-scope">
+      <button class="ai-scope-btn active" onclick="setScope(this,'doc')">当前文档</button>
+      <button class="ai-scope-btn" onclick="setScope(this,'tree')">文档树</button>
+      <button class="ai-scope-btn" onclick="setScope(this,'all')">全部文档</button>
+    </div>
+  </div>
+  <div class="ai-msgs" id="aiMsgs"></div>
+  <div class="ai-input-area">
+    <div class="ai-input-wrap">
+      <textarea class="ai-input" id="aiInput" rows="1" placeholder="问问这篇文档…" oninput="autoResize(this)"></textarea>
+      <button class="ai-send" id="aiSend" onclick="sendAI()">↑</button>
+    </div>
+  </div>
+</aside>
+</div>
+
+<!-- SLASH MENU -->
+<div class="slash-menu" id="slashMenu">
+  <div class="slash-search"><input placeholder="搜索内容块…" id="slashInput" oninput="filterSlash()"></div>
+  <div class="slash-list" id="slashList"></div>
+</div>
+
+<!-- WHITEBOARD OVERLAY -->
+<div class="wb-overlay" id="wbOverlay">
+  <div class="wb-expanded">
+    <div class="wb-header">
+      <div class="wb-title">🎨 交互式白板</div>
+      <div class="wb-tools">
+        <button class="wb-tool active" onclick="setWbTool('pen',this)">✏️</button>
+        <button class="wb-tool" onclick="setWbTool('eraser',this)">🧹</button>
+        <button class="wb-tool" onclick="wbUndo()">↩</button>
+        <button class="wb-tool" onclick="wbRedo()">↪</button>
+      </div>
+      <button style="margin-left:auto;padding:4px 12px;border:1px solid var(--border);background:var(--bg);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--fg-secondary);font-family:var(--font-sans)" onclick="closeWbOverlay()">收起 ✕</button>
+    </div>
+    <div class="wb-canvas-wrap" id="expWbWrap"><canvas id="expWbCanvas"></canvas></div>
+  </div>
+</div>
+
+<script>
+/* ===== DATA ===== */
+const TREE=[
+  {id:'overview',icon:'📋',title:'项目总览',children:[]},
+  {id:'design',icon:'🎨',title:'产品设计',open:true,children:[
+    {id:'needs',icon:'📝',title:'用户需求',children:[]},
+    {id:'features',icon:'⚙️',title:'功能模块',children:[]},
+    {id:'demo',icon:'🎬',title:'Demo 剧本',children:[]}
+  ]},
+  {id:'tech',icon:'💻',title:'技术实现',open:false,children:[
+    {id:'frontend',icon:'🖥️',title:'前端架构',children:[]},
+    {id:'rag',icon:'🔍',title:'RAG 设计',children:[]},
+    {id:'code-exec',icon:'⚡',title:'代码执行方案',children:[]}
+  ]}
+];
+
+const SLASH_ITEMS=[
+  {sec:'基础内容',items:[
+    {id:'h1',icon:'H₁',name:'标题 1',desc:'大标题，用于页面标题'},
+    {id:'h2',icon:'H₂',name:'标题 2',desc:'中标题，用于章节'},
+    {id:'h3',icon:'H₃',name:'标题 3',desc:'小标题，用于子章节'},
+    {id:'text',icon:'¶',name:'正文',desc:'普通文本段落'},
+    {id:'bullet',icon:'•',name:'项目符号列表',desc:'无序列表'},
+    {id:'numbered',icon:'1.',name:'编号列表',desc:'有序列表'},
+    {id:'todo',icon:'☐',name:'Todo List',desc:'待办事项清单'},
+    {id:'table',icon:'▦',name:'表格',desc:'数据表格'},
+    {id:'quote',icon:'❝',name:'引用',desc:'引用文本'},
+    {id:'divider',icon:'—',name:'分割线',desc:'水平分割线'}
+  ]},
+  {sec:'高级内容',items:[
+    {id:'code',icon:'🐍',name:'Python 代码块',desc:'可执行的 Python 代码'},
+    {id:'whiteboard',icon:'🎨',name:'交互式白板',desc:'手绘白板画布'},
+    {id:'chart3d',icon:'📊',name:'3D 图表',desc:'三维数据可视化'},
+    {id:'image',icon:'🖼️',name:'图片',desc:'插入图片'},
+    {id:'file',icon:'📎',name:'文件',desc:'附件文件'},
+    {id:'doclink',icon:'🔗',name:'链接到文档',desc:'内部文档链接'},
+    {id:'ai-answer',icon:'✦',name:'AI 回答块',desc:'AI 生成的内容块'}
+  ]}
+];
+
+let activeDoc='design';
+let aiScope='doc';
+let aiMsgs=[
+  {role:'ai',text:'你好！我是你的文档 AI 助手。我可以帮你理解和分析当前文档的内容。\n\n你可以问我关于文档的任何问题，或者让我帮你总结、解释文档中的内容。',cites:null,retrieval:null}
+];
+
+/* ===== TREE RENDER ===== */
+function renderTree(){
+  document.getElementById('tree').innerHTML=renderNodes(TREE);
+}
+function renderNodes(nodes){
+  return nodes.map(n=>{
+    const has=n.children&&n.children.length>0;
+    const isAct=n.id===activeDoc;
+    let h=`<div class="tree-node"><div class="tree-node-row${isAct?' active':''}" onclick="selDoc('${n.id}')">
+      <span class="tree-toggle${has?(n.open?' open':''):' leaf'}" onclick="event.stopPropagation();togNode('${n.id}')">▶</span>
+      <span class="tree-icon">${n.icon}</span>
+      <span class="tree-title">${n.title}</span>
+      <button class="tree-add" onclick="event.stopPropagation();addChild('${n.id}')" title="新建子文档">+</button>
+    </div>`;
+    if(has) h+=`<div class="tree-children${n.open?'':' collapsed'}" style="max-height:${n.open?n.children.length*40+'px':'0'}">${renderNodes(n.children)}</div>`;
+    return h+'</div>';
+  }).join('');
+}
+function selDoc(id){activeDoc=id;renderTree();renderEditor();updateBC()}
+function togNode(id){function t(ns){for(let n of ns){if(n.id===id){n.open=!n.open;return true}if(n.children&&t(n.children))return true}return false}t(TREE);renderTree()}
+function addChild(pid){function a(ns){for(let n of ns){if(n.id===pid){if(!n.children)n.children=[];n.children.push({id:'new-'+Date.now(),icon:'📄',title:'新建文档',children:[]});n.open=true;return true}if(n.children&&a(n.children))return true}return false}a(TREE);renderTree()}
+function addNewDoc(){addChild('overview')}
+function updateBC(){const el=document.getElementById('bcCur');function f(ns){for(let n of ns){if(n.id===activeDoc)return n.title;if(n.children){const r=f(n.children);if(r)return r}}return null}el.textContent=f(TREE)||'产品设计'}
+
+/* ===== EDITOR RENDER ===== */
+function renderEditor(){document.getElementById('editor').innerHTML=(DOCS[activeDoc]||DOCS.design)();initWbs();initCodes();initCharts()}
+
+const DOCS={
+  design(){
+    return dh('🎨','产品设计','AI 原生交互式文档系统的产品设计文档，包含核心功能定义、交互流程和视觉规范。')
+    +h2('核心功能定义')
+    +txt('本文档定义了 AI 原生交互式文档系统的核心功能模块。系统采用三栏布局：左侧文档树导航、中间页面式编辑区、右侧 AI 对话侧边栏。')
+    +todos([{t:'完成产品需求分析',d:1},{t:'定义核心 Block 类型',d:1},{t:'设计 AI 侧边栏交互',d:0},{t:'完成 Demo 剧本',d:0}])
+    +h2('功能模块概览')
+    +table(['模块','优先级','状态','负责人'],[['文档编辑器','P0','✅ 已完成','前端组'],['AI 侧边栏','P0','🔄 进行中','AI 组'],['代码执行','P1','📋 规划中','后端组'],['3D 图表','P1','📋 规划中','可视化组'],['白板绘制','P2','📋 规划中','前端组']])
+    +h2('技术架构')
+    +quote('系统基于 Block-aware Hierarchical RAG 技术，能够理解文档结构并进行精准的内容检索和回答。')
+    +txt('前端采用 React + TypeScript 构建，编辑器基于 Block 编辑范式，支持多种内容块的插入和编辑。AI 能力通过后端 API 接入，支持流式输出和上下文感知。')
+    +doclink('rag','🔍','RAG 设计')
+    +h2('Python 代码执行')
+    +txt('系统支持在文档中直接运行 Python 代码，类似 Jupyter Notebook 的体验，但完全嵌入在文档编辑流程中。')
+    +codeBlock('c1',`import pandas as pd\nimport numpy as np\n\n# 创建示例数据\ndata = {\n    '月份': ['1月', '2月', '3月', '4月', '5月', '6月'],\n    '用户数': [1200, 1800, 2400, 3100, 4200, 5600],\n    '收入(万)': [45, 68, 92, 125, 168, 224]\n}\n\ndf = pd.DataFrame(data)\nprint("📊 月度增长数据：")\nprint(df.to_string(index=False))\nprint(f"\\n📈 用户增长率: {((5600-1200)/1200*100):.1f}%")`)
+    +h2('3D 数据可视化')
+    +txt('表格数据和代码运行结果可以直接生成 3D 图表，提供更直观的数据展示方式。')
+    +chart3d()
+    +h2('交互式白板')
+    +txt('白板功能允许用户在文档中直接绘制草图、流程图和手写笔记，支持画笔、橡皮、撤销等基础操作。')
+    +whiteboard('wb1')
+    +h2('AI 文档问答')
+    +txt('AI 侧边栏能够基于当前文档内容进行智能问答，支持多种检索范围，返回结果包含引用来源，点击引用可以定位到对应的文档块。');
+  },
+  needs(){
+    return dh('📝','用户需求','目标用户画像、核心需求场景和使用流程分析。')
+    +h2('目标用户')
+    +txt('本产品主要面向以下用户群体：')
+    +bullet(['产品经理：需要撰写 PRD、需求文档，并进行数据分析','技术团队：需要编写技术文档、运行代码验证方案','数据分析师：需要整理数据报告、生成可视化图表','学生/研究人员：需要撰写论文、整理研究笔记'])
+    +h2('核心需求场景')
+    +todos([{t:'场景 1：快速创建结构化文档',d:1},{t:'场景 2：在文档中运行代码并查看结果',d:1},{t:'场景 3：基于文档内容进行 AI 问答',d:0},{t:'场景 4：数据可视化与 3D 图表',d:0}])
+    +h2('竞品分析')
+    +table(['产品','优势','不足','我们的差异'],[['Notion','编辑体验好、生态丰富','无代码执行、AI 能力弱','原生代码执行 + 深度 AI'],['AFFiNE','开源、本地优先','AI 集成不够深入','Block-aware RAG'],['Jupyter','代码执行强大','非文档工具、协作弱','文档 + 代码一体化'],['Obsidian','知识管理强','无实时协作、无 AI','AI 原生 + 实时协作']]);
+  },
+  features(){
+    return dh('⚙️','功能模块','各功能模块的详细设计和技术实现方案。')
+    +h2('Block 编辑器')
+    +txt('编辑器采用 Block 编辑范式，每个内容单元都是一个独立的 Block。支持拖拽排序、类型转换、嵌套结构。')
+    +h3('Block 类型清单')
+    +table(['Block 类型','交互方式','数据格式','特殊能力'],[['文本块','直接编辑','富文本','Markdown 快捷键'],['Todo 块','勾选切换','布尔 + 文本','进度统计'],['表格块','单元格编辑','行列数据','图表数据源'],['代码块','代码编辑器','Python 代码','执行 + 输出'],['白板块','画布绘制','路径数据','展开/收起'],['3D 图表块','拖拽旋转','3D 渲染','多数据源']])
+    +h2('AI 集成方案')
+    +txt('AI 能力是产品的核心差异化特性。通过 Block-aware Hierarchical RAG 技术，AI 能够理解文档的层级结构，提供精准的内容检索和智能问答。')
+    +doclink('rag','🔍','RAG 设计文档');
+  },
+  demo(){
+    return dh('🎬','Demo 剧本','产品演示脚本和关键交互流程设计。')
+    +h2('演示流程')
+    +todos([{t:'步骤 1：打开文档，展示三栏布局',d:1},{t:'步骤 2：使用 / 命令插入代码块',d:1},{t:'步骤 3：运行 Python 代码',d:0},{t:'步骤 4：生成 3D 图表',d:0},{t:'步骤 5：使用 AI 侧边栏问答',d:0},{t:'步骤 6：点击引用定位到文档块',d:0}])
+    +h2('演示数据')
+    +bullet(['示例文档树（5-8 个文档页面）','Python 数据分析代码（pandas + numpy）','3D 柱状图数据（6 个月度数据点）','AI 问答示例问题和回答']);
+  },
+  overview(){
+    return dh('📋','项目总览','AI 原生交互式文档系统的项目概览和整体规划。')
+    +h2('项目愿景')
+    +txt('打造下一代 AI 原生文档工具，让用户在同一份文档中完成写作、数据分析、代码执行和可视化呈现。')
+    +h2('核心能力')
+    +bullet(['Block 编辑：灵活的内容组织方式','代码执行：在文档中直接运行 Python','3D 图表：数据的立体可视化','AI 问答：基于文档内容的智能助手','白板绘制：手绘草图和流程图'])
+    +h2('技术栈')
+    +table(['层级','技术选型','说明'],[['前端框架','React + TypeScript','组件化开发'],['编辑器','Block 编辑范式','参考 Notion 架构'],['AI 引擎','RAG + LLM','Block-aware 检索'],['代码执行','Pyodide / 沙箱','浏览器端 Python'],['3D 渲染','Three.js / CSS 3D','图表可视化']])
+    +doclink('design','🎨','产品设计文档')
+    +doclink('tech','💻','技术实现文档');
+  },
+  tech(){
+    return dh('💻','技术实现','系统架构设计和技术实现方案。')
+    +h2('系统架构')
+    +txt('系统采用前后端分离架构，前端负责渲染和交互，后端提供 AI 能力和数据持久化。')
+    +h2('核心模块')
+    +bullet(['编辑器引擎：Block CRUD + 序列化','AI 代理：RAG 检索 + LLM 生成','代码沙箱：Python 执行环境','图表引擎：数据绑定 + 3D 渲染'])
+    +doclink('frontend','🖥️','前端架构')
+    +doclink('rag','🔍','RAG 设计')
+    +doclink('code-exec','⚡','代码执行方案');
+  },
+  frontend(){
+    return dh('🖥️','前端架构','前端技术选型、组件设计和状态管理方案。')
+    +h2('技术选型')
+    +table(['类别','选型','版本','说明'],[['框架','React','18.x','并发模式 + Suspense'],['语言','TypeScript','5.x','类型安全'],['状态','Zustand','4.x','轻量状态管理'],['样式','CSS Modules','-','组件级样式'],['构建','Vite','5.x','快速开发体验']])
+    +h2('组件架构')
+    +txt('组件采用分层设计：原子组件 → 分子组件 → 有机体 → 模板 → 页面。每个 Block 类型对应一个独立的组件。');
+  },
+  rag(){
+    return dh('🔍','RAG 设计','Block-aware Hierarchical RAG 技术方案。')
+    +h2('RAG 架构')
+    +txt('传统的 RAG 系统将文档视为纯文本进行检索，忽略了文档的结构信息。我们的 Block-aware RAG 能够理解文档的层级关系，提供更精准的检索结果。')
+    +h2('核心创新')
+    +bullet(['Block 级别向量化：每个 Block 独立向量化存储','层级感知检索：考虑 Block 的父子关系','上下文窗口：自动扩展到相关 Block','引用溯源：精确定位到源 Block'])
+    +h2('检索流程')
+    +txt('用户提问 → 查询理解 → Block 向量检索 → 层级扩展 → 上下文组装 → LLM 生成 → 引用标注')
+    +quote('关键创新：检索时不仅返回匹配的 Block，还自动扩展到其父级标题和相邻 Block，确保 AI 理解完整的上下文。');
+  },
+  'code-exec'(){
+    return dh('⚡','代码执行方案','Python 代码执行的技术实现和安全方案。')
+    +h2('执行环境')
+    +txt('代码执行采用双层方案：浏览器端使用 Pyodide（WebAssembly），服务端使用 Docker 沙箱。')
+    +h2('功能特性')
+    +bullet(['支持 Python 标准库和常用第三方库','实时输出 stdout/stderr','执行状态可视化','运行耗时统计','输出数据可传递给 3D 图表'])
+    +h2('安全机制')
+    +txt('代码在隔离的沙箱环境中执行，限制网络访问、文件系统权限和执行时间。超时自动终止，防止资源滥用。');
+  }
+};
+
+/* ===== BLOCK HELPERS ===== */
+const H='<div class="block-handle"><button class="block-handle-btn" title="拖拽">⠿</button><button class="block-handle-btn" title="更多">⋯</button></div>';
+function dh(icon,title,desc){return `<div class="doc-header"><div class="doc-icon">${icon}</div><h1 class="doc-title" contenteditable="true" data-placeholder="无标题">${title}</h1><p class="doc-desc">${desc}</p></div>`}
+function h2(t){return `<div class="block">${H}<div class="block-content"><h2 class="block-h2">${t}</h2></div></div>`}
+function h3(t){return `<div class="block">${H}<div class="block-content"><h3 class="block-h3">${t}</h3></div></div>`}
+function txt(t){return `<div class="block">${H}<div class="block-content"><p class="block-text">${t}</p></div></div>`}
+function quote(t){return `<div class="block">${H}<div class="block-content"><blockquote class="block-quote">${t}</blockquote></div></div>`}
+function bullet(items){return `<div class="block">${H}<div class="block-content"><ul class="block-list">${items.map(i=>'<li>'+i+'</li>').join('')}</ul></div></div>`}
+function todos(items){return `<div class="block">${H}<div class="block-content">${items.map(i=>`<div class="block-todo" onclick="togTodo(this)"><div class="todo-cb${i.d?' done':''}">${i.d?'✓':''}</div><span class="todo-text${i.d?' done':''}">${i.t}</span></div>`).join('')}</div></div>`}
+function table(hdrs,rows){return `<div class="block">${H}<div class="block-content"><div class="table-wrap"><table class="table"><thead><tr>${hdrs.map(h=>'<th contenteditable="true">'+h+'</th>').join('')}</tr></thead><tbody>${rows.map(r=>'<tr>'+r.map(c=>'<td contenteditable="true">'+c+'</td>').join('')+'</tr>').join('')}</tbody></table></div><div class="table-actions"><button class="table-action-btn" onclick="genChart(this)">📊 生成 3D 图表</button><button class="table-action-btn">+ 添加行</button><button class="table-action-btn">+ 添加列</button></div></div></div>`}
+function doclink(id,icon,title){return `<div class="block"><div class="block-content"><div class="doc-link" onclick="selDoc('${id}')"><span class="doc-link-icon">${icon}</span><span class="doc-link-title">${title}</span><span class="doc-link-arrow">→</span></div></div></div>`}
+function codeBlock(id,code){return `<div class="block" data-cid="${id}"><div class="block-content"><div class="code-block"><div class="code-hdr"><span class="code-lang">Python</span><span class="code-status" id="cs-${id}"><span class="code-status-dot"></span> 就绪</span><button class="code-run" id="cr-${id}" onclick="runCode('${id}')">▶ 运行</button></div><div class="code-editor"><textarea id="ct-${id}" spellcheck="false" onkeydown="if(event.key==='Tab'){event.preventDefault();const s=this.selectionStart,e=this.selectionEnd;this.value=this.value.substring(0,s)+'    '+this.value.substring(e);this.selectionStart=this.selectionEnd=s+4}">${code}</textarea></div><div class="code-output" id="co-${id}"><div class="code-output-hdr"><span>Output</span><span class="code-output-time" id="cotime-${id}"></span></div><div class="code-output-body" id="cob-${id}"></div></div><div class="code-chart-btn" id="ccb-${id}" style="display:none"><button class="table-action-btn" onclick="genChart(this)">📊 生成 3D 图表</button></div></div></div></div>`}
+function whiteboard(id){return `<div class="block"><div class="block-content"><div class="wb"><div class="wb-header"><div class="wb-title">🎨 交互式白板</div><div class="wb-tools"><button class="wb-tool active" onclick="setWbToolInline(this,'${id}','pen')">✏️</button><button class="wb-tool" onclick="setWbToolInline(this,'${id}','eraser')">🧹</button><button class="wb-tool" onclick="wbUndoInline('${id}')">↩</button><button class="wb-tool" onclick="wbRedoInline('${id}')">↪</button></div></div><div class="wb-canvas-wrap" id="wbw-${id}"><canvas id="wbc-${id}"></canvas><button class="wb-expand" onclick="openWbOverlay('${id}')" title="展开">⤢</button></div></div></div></div>`}
+function chart3d(){const bars=[{h:80,l:'1月'},{h:120,l:'2月'},{h:160,l:'3月'},{h:200,l:'4月'},{h:240,l:'5月'},{h:280,l:'6月'}];return `<div class="block"><div class="block-content"><div class="chart-block"><div class="chart-hdr"><span class="chart-title">📊 月度用户增长</span><span class="chart-source">数据来源：代码块 c1</span></div><div class="chart-canvas" id="chartArea">${bars.map(b=>`<div class="chart-bar" style="height:${b.h}px"><div class="chart-bar-front" style="height:${b.h}px"></div><div class="chart-bar-side" style="height:${b.h}px"></div><div class="chart-bar-top"></div></div>`).join('')}</div><div class="chart-labels">${bars.map(b=>'<div class="chart-label">'+b.l+'</div>').join('')}</div><div class="chart-footer"><button class="table-action-btn">📝 编辑数据</button><button class="table-action-btn">🔄 刷新</button></div></div></div></div>`}
+
+/* ===== INTERACTIONS ===== */
+function togTodo(el){const cb=el.querySelector('.todo-cb'),tx=el.querySelector('.todo-text');const d=cb.classList.toggle('done');tx.classList.toggle('done');cb.textContent=d?'✓':''}
+function toggleSidebar(){document.getElementById('sidebar').classList.toggle('collapsed')}
+function toggleAI(){document.getElementById('aiSidebar').classList.toggle('collapsed')}
+function setScope(btn,s){document.querySelectorAll('.ai-scope-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');aiScope=s;document.getElementById('aiInput').placeholder={doc:'问问这篇文档…',tree:'搜索当前文档树…',all:'搜索全部文档…'}[s]}
+
+/* ===== SLASH MENU ===== */
+let slashOn=false,slashHL=0,slashFlat=[];
+function showSlash(x,y){const m=document.getElementById('slashMenu');m.style.left=x+'px';m.style.top=y+'px';m.classList.add('on');slashOn=true;slashHL=0;renderSlash();document.getElementById('slashInput').value='';document.getElementById('slashInput').focus()}
+function hideSlash(){document.getElementById('slashMenu').classList.remove('on');slashOn=false}
+function renderSlash(f=''){const c=document.getElementById('slashList');let h='',i=0;slashFlat=[];SLASH_ITEMS.forEach(s=>{const fl=s.items.filter(it=>it.name.toLowerCase().includes(f)||it.desc.toLowerCase().includes(f));if(!fl.length)return;h+=`<div class="slash-section">${s.sec}</div>`;fl.forEach(it=>{h+=`<div class="slash-item${i===slashHL?' hl':''}" onclick="insertSlash('${it.id}')" onmouseenter="slashHL=${i};renderSlash('${f}')"><div class="slash-item-icon">${it.icon}</div><div><div class="slash-item-name">${it.name}</div><div class="slash-item-desc">${it.desc}</div></div></div>`;slashFlat.push(it);i++})});c.innerHTML=h}
+function filterSlash(){slashHL=0;renderSlash(document.getElementById('slashInput').value)}
+function insertSlash(t){hideSlash();console.log('Insert:',t)}
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&!slashOn&&document.activeElement.closest('.editor')){e.preventDefault();const r=document.activeElement.getBoundingClientRect();showSlash(r.left,r.bottom+4)}
+  if(e.key==='Escape'&&slashOn)hideSlash();
+  if(slashOn){if(e.key==='ArrowDown'){e.preventDefault();slashHL=Math.min(slashHL+1,slashFlat.length-1);renderSlash(document.getElementById('slashInput').value)}if(e.key==='ArrowUp'){e.preventDefault();slashHL=Math.max(slashHL-1,0);renderSlash(document.getElementById('slashInput').value)}if(e.key==='Enter'&&slashFlat[slashHL]){e.preventDefault();insertSlash(slashFlat[slashHL].id)}}
+});
+document.addEventListener('click',e=>{if(slashOn&&!e.target.closest('.slash-menu'))hideSlash()});
+
+/* ===== CODE EXECUTION ===== */
+function initCodes(){document.querySelectorAll('.code-editor textarea').forEach(t=>{t.style.height='auto';t.style.height=t.scrollHeight+'px';t.addEventListener('input',function(){this.style.height='auto';this.style.height=this.scrollHeight+'px'})})}
+function runCode(id){
+  const st=document.getElementById('cs-'+id),rb=document.getElementById('cr-'+id),op=document.getElementById('co-'+id),ob=document.getElementById('cob-'+id),tm=document.getElementById('cotime-'+id),cb=document.getElementById('ccb-'+id);
+  st.className='code-status running';st.innerHTML='<span class="code-status-dot"></span> <span class="spinner"></span> 运行中…';rb.className='code-run running';rb.innerHTML='<span class="spinner"></span> 运行中';op.style.display='block';ob.textContent='';ob.className='code-output-body';tm.textContent='';cb.style.display='none';
+  setTimeout(()=>{
+    if(Math.random()>.15){
+      st.className='code-status success';st.innerHTML='<span class="code-status-dot"></span> 运行成功';rb.className='code-run ok';rb.innerHTML='✓ 成功';
+      ob.textContent='📊 月度增长数据：\n  月份  用户数  收入(万)\n   1月    1200       45\n   2月    1800       68\n   3月    2400       92\n   4月    3100      125\n   5月    4200      168\n   6月    5600      224\n\n📈 用户增长率: 366.7%';
+      tm.textContent='耗时 0.23s';cb.style.display='flex';
+    }else{
+      st.className='code-status error';st.innerHTML='<span class="code-status-dot"></span> 运行失败';rb.className='code-run err';rb.innerHTML='✗ 失败';
+      ob.textContent='Traceback (most recent call last):\n  File "<stdin>", line 5, in <module>\nModuleNotFoundError: No module named \'pandas\'\n\n请确认已安装 pandas: pip install pandas';
+      ob.className='code-output-body err';tm.textContent='耗时 0.05s';
+    }
+    rb.onclick=function(){runCode(id)};
+  },1200+Math.random()*800);
+}
+
+/* ===== WHITEBOARD ===== */
+let wbTool='pen',wbPaths=[],wbRedoStack=[];
+const wbStates={};
+function initWbs(){document.querySelectorAll('.wb-canvas-wrap canvas').forEach(cv=>{const wrap=cv.parentElement;const id=cv.id.replace('wbc-','');cv.width=wrap.clientWidth;cv.height=wrap.clientHeight;const ctx=cv.getContext('2d');wbStates[id]={ctx,canvas:cv,paths:[],redo:[],drawing:false,tool:'pen'};cv.addEventListener('mousedown',e=>wbStart(e,id));cv.addEventListener('mousemove',e=>wbMove(e,id));cv.addEventListener('mouseup',()=>wbEnd(id));cv.addEventListener('mouseleave',()=>wbEnd(id))})}
+function wbStart(e,id){const s=wbStates[id];s.drawing=true;const r=s.canvas.getBoundingClientRect();const x=e.clientX-r.left,y=e.clientY-r.top;s.paths.push({tool:s.tool,pts:[{x,y}]});s.redo=[]}
+function wbMove(e,id){if(!wbStates[id].drawing)return;const s=wbStates[id];const r=s.canvas.getBoundingClientRect();s.paths[s.paths.length-1].pts.push({x:e.clientX-r.left,y:e.clientY-r.top});drawWb(s)}
+function wbEnd(id){wbStates[id].drawing=false}
+function drawWb(s){const ctx=s.ctx;ctx.clearRect(0,0,s.canvas.width,s.canvas.height);s.paths.forEach(p=>{if(p.pts.length<2)return;ctx.beginPath();ctx.moveTo(p.pts[0].x,p.pts[0].y);for(let i=1;i<p.pts.length;i++)ctx.lineTo(p.pts[i].x,p.pts[i].y);ctx.strokeStyle=p.tool==='eraser'?'#fefefe':'#333';ctx.lineWidth=p.tool==='eraser'?20:2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke()})}
+function setWbToolInline(btn,id,tool){const s=wbStates[id];if(s)s.tool=tool;btn.parentElement.querySelectorAll('.wb-tool').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+function wbUndoInline(id){const s=wbStates[id];if(s&&s.paths.length){s.redo.push(s.paths.pop());drawWb(s)}}
+function wbRedoInline(id){const s=wbStates[id];if(s&&s.redo.length){s.paths.push(s.redo.pop());drawWb(s)}}
+function setWbTool(t,btn){wbTool=t;btn.parentElement.querySelectorAll('.wb-tool').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
+function wbUndo(){const s=wbStates['exp'];if(s&&s.paths.length){s.redo.push(s.paths.pop());drawWb(s)}}
+function wbRedo(){const s=wbStates['exp'];if(s&&s.redo.length){s.paths.push(s.redo.pop());drawWb(s)}}
+function openWbOverlay(id){document.getElementById('wbOverlay').classList.add('on');setTimeout(()=>{const wrap=document.getElementById('expWbWrap');const cv=document.getElementById('expWbCanvas');cv.width=wrap.clientWidth;cv.height=wrap.clientHeight;const ctx=cv.getContext('2d');wbStates['exp']={ctx,canvas:cv,paths:[],redo:[],drawing:false,tool:wbTool};cv.addEventListener('mousedown',e=>wbStart(e,'exp'));cv.addEventListener('mousemove',e=>wbMove(e,'exp'));cv.addEventListener('mouseup',()=>wbEnd('exp'));cv.addEventListener('mouseleave',()=>wbEnd('exp'))},100)}
+function closeWbOverlay(){document.getElementById('wbOverlay').classList.remove('on')}
+
+/* ===== 3D CHART INTERACTION ===== */
+function initCharts(){const area=document.getElementById('chartArea');if(!area)return;let dragging=false,sx,sy,rx=15,ry=-25;const scene=area.querySelector('.chart-bar-group');if(!scene)return;area.addEventListener('mousedown',e=>{dragging=true;sx=e.clientX;sy=e.clientY});document.addEventListener('mousemove',e=>{if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;ry+=dx*.3;rx-=dy*.3;rx=Math.max(-60,Math.min(60,rx));scene.style.transform=`rotateX(${rx}deg) rotateY(${ry}deg)`;sx=e.clientX;sy=e.clientY});document.addEventListener('mouseup',()=>{dragging=false})}
+function genChart(btn){console.log('Generate 3D chart from table data')}
+
+/* ===== AI SIDEBAR ===== */
+function renderAI(){const c=document.getElementById('aiMsgs');c.innerHTML=aiMsgs.map(m=>{const av=m.role==='user'?'<div class="ai-avatar user">👤</div>':'<div class="ai-avatar bot">✦</div>';const nm=m.role==='user'?'你':'AI 助手';let body=m.text.replace(/\n/g,'<br>');let cites='';if(m.cites){cites=`<div class="ai-citations"><div class="ai-citations-label">引用来源</div>${m.cites.map((ci,i)=>`<div class="ai-cite" onclick="citeClick('${ci.doc}','${ci.block}')"><span class="ai-cite-num">[${i+1}]</span>${ci.path}</div>`).join('')}</div>`}
+let ret='';if(m.retrieval) ret=`<div class="ai-retrieval">🔍 ${m.retrieval}</div>`;
+return `<div class="ai-msg">${av}<div class="ai-msg-body"><div class="ai-msg-name">${nm}</div><div class="ai-msg-text">${body}</div>${cites}${ret}</div></div>`}).join('');c.scrollTop=c.scrollHeight}
+
+function sendAI(){
+  const inp=document.getElementById('aiInput');const txt=inp.value.trim();if(!txt)return;
+  aiMsgs.push({role:'user',text:txt,cites:null,retrieval:null});inp.value='';autoResize(inp);renderAI();
+  document.getElementById('aiSend').classList.remove('active');
+  // Simulate AI thinking
+  setTimeout(()=>{
+    aiMsgs.push({role:'ai',text:'',cites:null,retrieval:'正在检索相关内容…',loading:true});renderAI();
+    setTimeout(()=>{
+      aiMsgs.pop();
+      const responses=[
+        {text:'根据当前文档内容，这个产品设计包含以下核心模块：\n\n1. **Block 编辑器** — 支持文本、Todo、表格、代码等多种内容块\n2. **AI 侧边栏** — 基于文档内容的智能问答\n3. **Python 代码执行** — 嵌入式代码运行环境\n4. **3D 数据可视化** — 将表格和代码数据转为 3D 图表\n5. **交互式白板** — 手绘草图和流程图\n\n这些模块共同构成了一个 AI 原生的文档编辑体验。',cites:[{doc:'design',block:'features',path:'产品设计 / 功能模块概览'},{doc:'design',block:'arch',path:'产品设计 / 技术架构'}],retrieval:'基于 5 个相关内容块生成'},
+        {text:'从技术架构角度看，系统采用前后端分离设计：\n\n- **前端**：React + TypeScript，基于 Block 编辑范式\n- **AI 引擎**：Block-aware Hierarchical RAG，能够理解文档结构\n- **代码执行**：浏览器端 Pyodide + 服务端 Docker 沙箱\n\n关键创新在于 RAG 系统能够感知文档的层级结构，不仅检索匹配的 Block，还会扩展到父级标题和相邻内容。',cites:[{doc:'rag',block:'innovation',path:'RAG 设计 / 核心创新'},{doc:'frontend',block:'stack',path:'前端架构 / 技术选型'}],retrieval:'已参考：当前文档、相邻内容、父级标题'},
+        {text:'用户需求分析表明，目标用户主要包括产品经理、技术团队和数据分析师。核心需求场景包括：\n\n- 快速创建结构化文档\n- 在文档中运行代码并查看结果\n- 基于文档内容进行 AI 问答\n- 数据可视化与 3D 图表\n\n相比竞品（Notion、AFFiNE、Jupyter），我们的核心差异化在于**原生代码执行 + 深度 AI 集成**。',cites:[{doc:'needs',block:'users',path:'用户需求 / 目标用户'},{doc:'needs',block:'scenarios',path:'用户需求 / 核心需求场景'}],retrieval:'基于 4 个相关内容块生成'}
+      ];
+      const resp=responses[Math.floor(Math.random()*responses.length)];
+      aiMsgs.push({role:'ai',text:resp.text,cites:resp.cites,retrieval:resp.retrieval});renderAI();
+    },1500);
+  },500);
+}
+
+function citeClick(doc,block){
+  // Scroll to block and highlight
+  const editor=document.getElementById('editor');
+  const blocks=editor.querySelectorAll('.block');
+  if(blocks.length>2){const target=blocks[Math.floor(Math.random()*blocks.length)];target.scrollIntoView({behavior:'smooth',block:'center'});target.classList.add('block-highlight');setTimeout(()=>target.classList.remove('block-highlight'),1500)}
+}
+
+document.getElementById('aiInput').addEventListener('input',function(){document.getElementById('aiSend').classList.toggle('active',this.value.trim().length>0)});
+document.getElementById('aiInput').addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendAI()}});
+function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px'}
+
+/* ===== INIT ===== */
+renderTree();renderEditor();renderAI();
+</script>
+</body>
+</html>
