@@ -53,7 +53,7 @@ export function BlockRenderer({ block }: Props) {
     case 'doclink':
       return <DocLinkBlock block={block} />;
     case 'whiteboard':
-      return <WhiteboardBlock block={block} onUpdate={handleUpdate} />;
+      return <WhiteboardBlock block={block} onUpdate={handleUpdate} blockId={block.id} />;
     case 'chart3d':
       return <Chart3DBlock block={block} />;
     case 'ai-answer':

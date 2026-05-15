@@ -62,7 +62,7 @@
 * 路由方案：Next.js App Router
 * 富文本 / 块编辑器：BlockNote 或 Tiptap
 * 代码编辑器：Monaco Editor 或 CodeMirror
-* 白板组件：tldraw 或 Excalidraw
+* 白板组件：原生 Canvas API（简单画笔白板，与 UI 原型一致）
 * 3D 图表：Plotly.js / ECharts GL / Three.js
 * Markdown 渲染：react-markdown
 * 图标库：lucide-react
@@ -168,7 +168,7 @@
    负责根据表格数据、代码输出数据或用户输入数据生成 3D 图表配置。
 
 9. 白板模块
-   负责保存白板绘图 JSON、画笔状态、图形对象和导出预览图。
+   负责保存白板绘图路径 JSON（画笔/橡皮路径数组）、撤销重做状态。
 
 10. 文件与资源模块
     负责图片、附件、白板快照、图表快照、代码输出文件等资源存储。
@@ -424,7 +424,7 @@ image, file, audio, video
    Python 可执行代码块。前端 UI 原型已有基础结构，需要集成 Monaco Editor 或 CodeMirror 作为代码编辑器，并集成 Pyodide 实现代码执行。
 
 6. `WhiteboardBlock.tsx`
-   白板块。前端 UI 原型已有基础结构，需要集成 tldraw 或 Excalidraw 真实库实现完整绘图能力。
+   白板块。使用原生 Canvas API 实现简单画笔白板，支持画笔、橡皮、撤销、重做，数据格式为路径数组 JSON。与 UI 原型中白板交互一致。
 
 7. `Chart3DBlock.tsx`
    3D 图表块。前端 UI 原型已有基础结构，需要集成 Plotly.js 或 ECharts GL 实现真实 3D 图表渲染。
@@ -705,7 +705,9 @@ ai_answer
 
 ```json
 {
-  "whiteboard_id": "wb_001"
+  "whiteboardSnapshot": [
+    {"tool": "pen", "pts": [{"x": 10, "y": 20}, {"x": 15, "y": 25}]}
+  ]
 }
 ```
 
@@ -775,7 +777,7 @@ updated_at
 
 保存白板块的绘图内容。
 
-`data_json` 保存 tldraw / Excalidraw 的图形对象数据。
+`data_json` 保存路径数组，格式为 `[{ tool: 'pen'|'eraser', pts: [{x,y}, ...] }, ...]`。
 
 本阶段白板内容不需要 AI 理解。
 
@@ -786,10 +788,9 @@ MVP 支持：
 * 橡皮；
 * 撤销；
 * 重做；
-* 简单图形；
-* 文本标注；
-* 保存和重新加载；
-* 导出预览图。
+* 保存和重新加载。
+
+实现方式：使用原生 Canvas API，不依赖第三方白板库。与 UI 原型 `proto-index.html` 中白板交互一致。
 
 本阶段不要求：
 
@@ -797,7 +798,8 @@ MVP 支持：
 * 高精度笔迹优化；
 * 手写识别；
 * 白板内容 AI 理解；
-* Notability 级别书写体验。
+* Notability 级别书写体验；
+* 简单图形和文本标注（后续可扩展）。
 
 ---
 
@@ -1502,11 +1504,13 @@ Demo 阶段无需登录。
 
 ```json
 {
-  "data_json": {
-    "elements": [],
-    "appState": {}
-  },
-  "preview_image_url": "https://example.com/preview.png"
+  "data_json": [
+    {
+      "tool": "pen",
+      "pts": [{"x": 10, "y": 20}, {"x": 15, "y": 25}]
+    }
+  ],
+  "preview_image_url": null
 }
 ```
 
@@ -1555,11 +1559,13 @@ Demo 阶段无需登录。
 ```json
 {
   "block_id": "block_005",
-  "data_json": {
-    "elements": [],
-    "appState": {}
-  },
-  "preview_image_url": "https://example.com/preview.png"
+  "data_json": [
+    {
+      "tool": "pen",
+      "pts": [{"x": 10, "y": 20}, {"x": 15, "y": 25}]
+    }
+  ],
+  "preview_image_url": null
 }
 ```
 
@@ -2561,25 +2567,31 @@ MVP 支持：
 
 ## 13.3 数据保存方式
 
-白板不保存成图片，而是保存成结构化 JSON。
+白板不保存成图片，而是保存成路径数组 JSON。
 
 ```json
-{
-  "elements": [
-    {
-      "id": "shape_001",
-      "type": "draw",
-      "points": [],
-      "stroke": "#000000"
-    }
-  ],
-  "appState": {
-    "zoom": 1,
-    "scrollX": 0,
-    "scrollY": 0
+[
+  {
+    "tool": "pen",
+    "pts": [
+      {"x": 10, "y": 20},
+      {"x": 15, "y": 25},
+      {"x": 20, "y": 30}
+    ]
+  },
+  {
+    "tool": "eraser",
+    "pts": [
+      {"x": 50, "y": 60},
+      {"x": 55, "y": 65}
+    ]
   }
-}
+]
 ```
+
+每条路径包含：
+- `tool`：工具类型，`pen`（画笔，黑色线宽 2）或 `eraser`（橡皮，白色线宽 20）
+- `pts`：坐标点数组，每个点包含 `x` 和 `y`
 
 图片只作为预览，不作为主数据。
 

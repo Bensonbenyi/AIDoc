@@ -401,6 +401,94 @@ npm run dev
 - GET /api/documents/{id} — 文档详情包含 blocks
 - blocks 的 block_type 使用后端格式（heading_1, paragraph 等）
 
+## 阶段 4：白板功能对接 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 4.1：实现白板后端 API ✅
+
+**修改的文件**:
+- `backend/app/services/whiteboard_service.py` - 白板数据 Service 层（新建）
+- `backend/app/routers/blocks.py` - 添加白板相关 API 路由
+
+**完成内容**:
+- 创建了 `whiteboard_service.py`，实现白板数据的存储和获取逻辑：
+  - `save_whiteboard` — 保存或更新白板数据，支持 upsert 操作
+  - `get_whiteboard` — 获取指定 block 的白板数据
+- 在 `blocks.py` 中添加了白板相关路由：
+  - `PUT /api/blocks/{block_id}/whiteboard` — 保存白板数据
+  - `GET /api/blocks/{block_id}/whiteboard` — 获取白板数据
+
+### 步骤 4.2：前端白板集成与后端对接 ✅
+
+**修改的文件**:
+- `frontend/src/components/editor/blocks/WhiteboardBlock.tsx` - 重写白板组件
+- `frontend/src/components/editor/BlockRenderer.tsx` - 更新以传递 blockId
+
+**完成内容**:
+- 使用原生 Canvas API 实现简单白板（与 UI 原型一致），不依赖第三方白板库
+- 实现了画笔、橡皮、撤销、重做工具
+- 白板数据格式为路径数组：`{ tool: 'pen'|'eraser', pts: {x,y}[] }[]`
+- 使用点阵背景（radial-gradient）模拟原型白板效果
+- 实现了从后端加载白板数据（通过 `GET /api/blocks/{block_id}/whiteboard`）
+- 实现了自动保存机制（debounce 3 秒）
+- 保存时调用 `PUT /api/blocks/{block_id}/whiteboard`
+- 添加了保存状态指示器（保存中/已保存/保存失败）
+- 支持展开/收起模式
+- 支持拖拽调整白板高度（200-800px）
+- 更新了 `BlockRenderer.tsx`，传递 `blockId` 给 `WhiteboardBlock`
+
+### 步骤 4.3：后端白板 Schema 修复 ✅
+
+**修改的文件**:
+- `backend/app/schemas/whiteboard.py` - schema 类型修复
+- `backend/app/services/whiteboard_service.py` - `data_json` 参数类型修复
+
+**完成内容**:
+- 将后端 schema 的 `data_json` 字段类型从 `dict` 改为 `Any`，接受任意 JSON 数据（包括数组）
+- `whiteboard_service.py` 的 `save_whiteboard` 函数 `data_json` 参数类型从 `dict` 改为 `Any`
+- 使用 `api.ts` 中的 `put` 和 `get` 函数进行请求，自动进行 snake_case ↔ camelCase 转换
+
+## 如何测试阶段 4
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证白板功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **创建白板块**: 使用斜杠命令 `/` 选择"白板"，创建白板块
+2. **画笔绘制**: 默认使用画笔工具，在白板上绘制线条
+3. **橡皮擦**: 切换到橡皮工具，擦除已绘制的内容
+4. **撤销/重做**: 点击撤销/重做按钮，或使用快捷操作
+5. **自动保存**: 绘制停止 3 秒后，应自动保存到后端
+6. **保存状态**: 白板块顶部显示保存状态图标（✓ 表示已保存）
+7. **重新加载**: 刷新页面后，白板内容应从后端加载并恢复
+8. **拖拽调整大小**: 鼠标悬停在白板底部，拖拽手柄出现，上下拖拽可调整高度
+9. **展开模式**: 点击最大化按钮，白板应以更大的全屏模式显示
+10. **收起模式**: 在展开模式下点击收起按钮，恢复内联显示
+
+### 4. 检查后端数据
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- `PUT /api/blocks/{block_id}/whiteboard` — 保存白板数据
+- `GET /api/blocks/{block_id}/whiteboard` — 获取白板数据
+- 数据库 `whiteboard_data` 表中应有对应的记录
+
 ## 下一步
 
-阶段 3 已完成，可以开始阶段 4（白板功能对接）或阶段 5（代码执行功能）。
+阶段 4 已完成，可以开始阶段 5（代码执行功能）或阶段 6（3D 图表功能）。

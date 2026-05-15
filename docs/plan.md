@@ -426,22 +426,33 @@
    - `PUT /api/blocks/{block_id}/whiteboard` — 保存白板数据
    - `GET /api/blocks/{block_id}/whiteboard` — 获取白板数据
 
-### 步骤 4.2：前端白板集成真实库并对接后端
+### 步骤 4.2：前端白板实现与后端对接
 
 **指令：**
 
-前端白板块（`WhiteboardBlock.tsx`）目前只有基础 UI 结构，需要集成真实的白板库并对接后端。要求：
+前端白板块（`WhiteboardBlock.tsx`）目前只有基础 UI 结构，需要实现完整的白板功能并对接后端。要求：
 
-1. 安装白板库（选择其一）：
-   - `npm install @tldraw/tldraw`（推荐，React 组件完善）
-   - 或 `npm install @excalidraw/excalidraw`
-2. 修改 `frontend/src/components/editor/blocks/WhiteboardBlock.tsx`：
-   - 替换占位 UI 为真实的白板组件
+1. 使用原生 Canvas API 实现简单白板（与 UI 原型 `proto-index.html` 一致），**不使用第三方白板库**：
+   - 画笔工具（pen）：鼠标按下并拖动时绘制黑色线条（线宽 2）
+   - 橡皮工具（eraser）：鼠标按下并拖动时以白色覆盖（线宽 20）
+   - 撤销：弹出最后一个路径到 redo 栈
+   - 重做：从 redo 栈恢复路径
+   - 点阵背景：使用 `radial-gradient(circle, #e5e5e5 1px, transparent 1px)`，size 20px
+2. 白板数据格式为路径数组：
+   ```json
+   [
+     { "tool": "pen", "pts": [{"x": 10, "y": 20}, {"x": 15, "y": 25}] },
+     { "tool": "eraser", "pts": [{"x": 50, "y": 60}] }
+   ]
+   ```
+3. 修改 `frontend/src/components/editor/blocks/WhiteboardBlock.tsx`：
+   - 实现 Canvas 绘图逻辑
    - 组件挂载时从后端加载白板数据（如果 block 有关联的白板数据）
-   - 用户绘制停止后（debounce 3 秒），自动保存白板 JSON 到后端
+   - 用户绘制停止后（debounce 3 秒），自动保存路径数组 JSON 到后端
    - 保存时调用 `PUT /api/blocks/{block_id}/whiteboard`
-3. 白板数据格式保持与所选库兼容的 JSON 结构
 4. 添加保存状态指示（保存中/已保存/保存失败）
+5. 支持展开/收起模式（展开时以全屏 overlay 显示更大的白板）
+6. 支持拖拽调整白板高度（200-800px，底部拖拽手柄）
 
 ---
 
