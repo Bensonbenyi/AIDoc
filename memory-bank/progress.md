@@ -670,3 +670,124 @@ npm run dev
 ## 下一步
 
 阶段 5 已完成（代码执行已改为 Docker 后端执行），可以开始阶段 6（3D 图表功能）或阶段 7（AI 对话功能）。
+
+## 阶段 6：3D 图表功能 ✅
+
+**完成时间**: 2026-05-15
+
+### 步骤 6.1：实现 3D 图表后端 API ✅
+
+**修改的文件**:
+- `backend/app/services/chart_service.py` - 3D 图表 Service 层（新建）
+- `backend/app/routers/charts.py` - 3D 图表 API 路由（新建）
+- `backend/app/main.py` - 注册图表路由
+- `frontend/src/lib/api.ts` - 添加图表 API 函数
+
+**完成内容**:
+- 创建了 `chart_service.py`，实现图表数据的存储和获取逻辑：
+  - `create_chart` — 创建图表记录
+  - `get_chart` — 获取图表数据
+  - `get_chart_by_block` — 根据 block_id 获取图表
+  - `update_chart` — 更新图表数据
+  - `save_chart_by_block` — 根据 block_id 保存或更新（upsert）
+  - `generate_chart_from_table` — 从表格数据生成图表配置
+  - `generate_chart_from_code_output` — 从代码输出生成图表配置
+- 创建了 `charts.py` 路由：
+  - `POST /api/charts/3d` — 创建 3D 图表
+  - `GET /api/charts/{chart_id}` — 获取图表
+  - `PATCH /api/charts/{chart_id}` — 更新图表
+  - `GET /api/charts/by-block/{block_id}` — 根据 block_id 获取图表
+  - `PUT /api/charts/by-block/{block_id}` — 根据 block_id 保存图表
+- 前端 `api.ts` 添加了 `chartsAPI` 和 `whiteboardAPI`
+
+### 步骤 6.2：集成 3D 图表库并实现完整功能 ✅
+
+**修改的文件**:
+- `frontend/src/components/editor/blocks/Chart3DBlock.tsx` - 重写 3D 图表组件
+- `frontend/src/components/editor/BlockRenderer.tsx` - 更新以传递 onUpdate
+- `frontend/src/types/block.ts` - 更新 Chart3DData 类型定义
+- `frontend/package.json` - 添加 plotly.js 和 react-plotly.js 依赖
+
+**完成内容**:
+- 安装了 `plotly.js-dist-min` 和 `react-plotly.js` 及其类型声明
+- 使用 Plotly.js 实现真正的 3D 图表渲染，支持：
+  - 3D 柱状图（默认）
+  - 3D 散点图（当有 Z 轴数据时）
+  - 3D 曲面图（当 chartType 为 surface 时）
+- 支持鼠标旋转、缩放、平移交互
+- 实现了数据编辑面板：
+  - 手动输入 X/Y/Z 轴数据（逗号分隔）
+  - 设置轴标签
+  - 设置图表标题
+- 图表数据自动保存到后端（debounce 1 秒）
+- 添加了保存状态指示器（保存中/已保存/保存失败）
+- 支持展开/收起模式（全屏显示更大的图表）
+- 更新了 Chart3DData 类型以支持新格式
+
+### 步骤 6.3：实现从表格/代码导入数据到图表 ✅
+
+**修改的文件**:
+- `frontend/src/components/editor/blocks/Chart3DBlock.tsx` - 添加导入功能
+
+**完成内容**:
+- 在数据编辑面板中添加了"导入数据"按钮
+- 支持从表格 block 导入：
+  - 弹出文档内所有表格 block 的列表
+  - 用户选择一个表格后，自动解析表头和数据行
+  - 第一列作为 X 轴，第二列作为 Y 轴，第三列作为 Z 轴（如果有）
+- 支持从代码输出导入：
+  - 弹出文档内所有已执行成功的代码 block 的列表
+  - 解析代码输出中的 JSON 数据
+  - 支持对象数组和标准图表数据格式
+- 导入后自动更新图表并保存到后端
+
+## 如何测试阶段 6
+
+### 1. 启动后端服务
+
+```bash
+cd backend
+uv sync
+uv run python scripts/init_db.py  # 初始化数据库和种子数据
+uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. 启动前端服务
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 3. 验证 3D 图表功能
+
+在浏览器中打开 http://localhost:3000：
+
+1. **创建图表块**: 使用斜杠命令 `/` 选择"3D 图表"
+2. **图表渲染**: 图表应显示为交互式 3D 柱状图
+3. **交互操作**: 鼠标可以旋转、缩放、平移图表
+4. **编辑数据**: 点击设置按钮打开数据编辑面板
+5. **手动输入**: 输入 X/Y/Z 轴数据，点击"应用"更新图表
+6. **展开模式**: 点击最大化按钮，图表以全屏模式显示
+7. **自动保存**: 修改数据后 1 秒自动保存到后端
+8. **保存状态**: 工具栏显示保存状态图标
+
+### 4. 验证导入功能
+
+1. **创建表格**: 先创建一个表格 block，填入数据
+2. **创建图表**: 创建一个图表 block
+3. **导入表格数据**: 点击设置 → 导入数据 → 选择表格
+4. **验证导入**: 图表应更新为表格数据
+5. **代码导入**: 创建代码块，运行生成 JSON 数据，然后在图表中导入
+
+### 5. 检查后端数据
+
+通过 Swagger UI (http://localhost:8000/docs) 验证：
+- `POST /api/charts/3d` — 创建图表
+- `GET /api/charts/{chart_id}` — 获取图表
+- `PUT /api/charts/by-block/{block_id}` — 保存图表
+- 数据库 `chart_3d` 表中应有对应的记录
+
+## 下一步
+
+阶段 6 已完成，可以开始阶段 7（AI 对话功能）。

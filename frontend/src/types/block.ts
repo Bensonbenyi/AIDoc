@@ -70,7 +70,15 @@ export interface WhiteboardData {
 export interface Chart3DData {
   title: string;
   source?: string;
-  bars: { label: string; height: number }[];
+  chartType?: 'bar' | 'scatter' | 'surface';
+  x: (string | number)[];
+  y: (string | number)[];
+  z?: (string | number)[] | null;
+  xLabel?: string;
+  yLabel?: string;
+  zLabel?: string;
+  // 兼容旧格式
+  bars?: { label: string; height: number }[];
 }
 
 export interface SlashMenuItem {

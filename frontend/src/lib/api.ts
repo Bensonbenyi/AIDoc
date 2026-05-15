@@ -370,3 +370,78 @@ export const codeExecutionAPI = {
   getByBlock: (blockId: string, limit: number = 10): Promise<CodeExecutionResponse[]> =>
     get(`/api/code-executions/by-block/${blockId}?limit=${limit}`),
 };
+
+// ==============================
+// 3D 图表 API
+// ==============================
+
+export interface Chart3DCreateData {
+  documentId: string;
+  sourceType?: "manual" | "table" | "code_output" | "csv";
+  sourceBlockId?: string | null;
+  dataJson: Record<string, unknown>;
+}
+
+export interface Chart3DResponse {
+  chartId: string;
+  chartConfig: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 3D 图表 API
+ */
+export const chartsAPI = {
+  /** 创建 3D 图表 */
+  create: (blockId: string, data: Chart3DCreateData): Promise<Chart3DResponse> =>
+    post(`/api/charts/3d?block_id=${blockId}`, data),
+
+  /** 获取图表数据 */
+  get: (chartId: string): Promise<Chart3DResponse> =>
+    get(`/api/charts/${chartId}`),
+
+  /** 更新图表数据 */
+  update: (chartId: string, data: Chart3DCreateData): Promise<Chart3DResponse> =>
+    patch(`/api/charts/${chartId}`, data),
+
+  /** 根据 block_id 获取图表数据 */
+  getByBlock: (blockId: string): Promise<Chart3DResponse> =>
+    get(`/api/charts/by-block/${blockId}`),
+
+  /** 根据 block_id 保存或更新图表数据 */
+  saveByBlock: (blockId: string, data: Chart3DCreateData): Promise<Chart3DResponse> =>
+    put(`/api/charts/by-block/${blockId}`, data),
+};
+
+// ==============================
+// 白板 API
+// ==============================
+
+export interface WhiteboardSaveData {
+  dataJson: unknown;
+  previewImageUrl?: string | null;
+}
+
+export interface WhiteboardResponse {
+  id: string;
+  blockId: string;
+  documentId: string;
+  dataJson: unknown;
+  previewImageUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 白板 API（通过 blocks 路由）
+ */
+export const whiteboardAPI = {
+  /** 保存白板数据 */
+  save: (blockId: string, data: WhiteboardSaveData): Promise<WhiteboardResponse> =>
+    put(`/api/blocks/${blockId}/whiteboard`, data),
+
+  /** 获取白板数据 */
+  get: (blockId: string): Promise<WhiteboardResponse> =>
+    get(`/api/blocks/${blockId}/whiteboard`),
+};

@@ -55,7 +55,7 @@ export function BlockRenderer({ block }: Props) {
     case 'whiteboard':
       return <WhiteboardBlock block={block} onUpdate={handleUpdate} blockId={block.id} />;
     case 'chart3d':
-      return <Chart3DBlock block={block} />;
+      return <Chart3DBlock block={block} onUpdate={handleUpdate} />;
     case 'ai-answer':
       return <AIAnswerBlock block={block} />;
     default:
