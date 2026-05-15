@@ -30,6 +30,7 @@ export function TextBlock({ block, onUpdate }: Props) {
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLDivElement>) => {
       if (event.key !== 'Enter') return;
+      if (event.nativeEvent.isComposing) return;
       if (event.shiftKey) return;
 
       event.preventDefault();

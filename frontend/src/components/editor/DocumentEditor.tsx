@@ -18,9 +18,10 @@ import {
 
 interface BaseTextLineProps {
   insertIndex: number;
+  isLast?: boolean;
 }
 
-function BaseTextLine({ insertIndex }: BaseTextLineProps) {
+function BaseTextLine({ insertIndex, isLast }: BaseTextLineProps) {
   const activeDocId = useAppStore((s) => s.activeDocId);
   const slashMenuOpen = useAppStore((s) => s.slashMenuOpen);
   const slashMenuContext = useAppStore((s) => s.slashMenuContext);
@@ -97,6 +98,7 @@ function BaseTextLine({ insertIndex }: BaseTextLineProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (e.key === 'Enter') {
+        if (e.nativeEvent.isComposing) return;
         e.preventDefault();
         if (slashMenuOpen && slashMenuContext?.sourceLineId === lineId) return;
 
@@ -173,6 +175,7 @@ function BaseTextLine({ insertIndex }: BaseTextLineProps) {
       ref={lineRef}
       data-base-line-index={insertIndex}
       data-editor-focus-target="true"
+      data-placeholder={isLast ? '输入 / 选择模块' : undefined}
       contentEditable
       suppressContentEditableWarning
       className={`base-text-line rounded-md px-7 text-[15px] leading-relaxed outline-none whitespace-pre-wrap transition-[min-height,padding] ${
@@ -199,6 +202,19 @@ export function DocumentEditor() {
   useEffect(() => {
     loadDocument(activeDocId);
   }, [activeDocId, loadDocument]);
+
+  // 文档初次加载完成后自动聚焦到底部编辑区（仅一次）
+  const hasFocusedRef = useRef(false);
+  useEffect(() => {
+    if (isLoading) {
+      hasFocusedRef.current = false;
+      return;
+    }
+    if (!hasFocusedRef.current) {
+      hasFocusedRef.current = true;
+      requestAnimationFrame(() => focusBaseTextLine(blocks.length));
+    }
+  }, [isLoading, activeDocId, blocks.length]);
 
   useEffect(() => {
     const handleUndo = (event: KeyboardEvent) => {
@@ -255,11 +271,11 @@ export function DocumentEditor() {
 
           <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
             <div>
-              <BaseTextLine insertIndex={0} />
+              <BaseTextLine insertIndex={0} isLast={blocks.length === 0} />
               {blocks.map((block, index) => (
                 <Fragment key={block.id}>
                   <SortableBlock block={block} />
-                  <BaseTextLine insertIndex={index + 1} />
+                  <BaseTextLine insertIndex={index + 1} isLast={index === blocks.length - 1} />
                 </Fragment>
               ))}
             </div>

@@ -136,6 +136,7 @@ export function SortableBlock({ block }: Props) {
     const isControlTarget = target instanceof HTMLElement && target.closest('button, [data-block-handle]');
 
     if (e.key === 'Enter') {
+      if (e.nativeEvent.isComposing) return;
       if (e.shiftKey || editable instanceof HTMLTextAreaElement || isControlTarget) return;
 
       e.preventDefault();

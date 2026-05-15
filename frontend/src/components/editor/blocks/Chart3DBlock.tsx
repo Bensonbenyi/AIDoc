@@ -188,6 +188,14 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
     }
   }, [chartData, showEditor]);
 
+  // 输入框键盘事件处理 — 阻止冒泡到 SortableBlock，保护 IME 组合
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // IME 组合中，不拦截任何按键
+    if (e.nativeEvent.isComposing) return;
+    // 阻止冒泡，防止父组件的 onKeyDownCapture 干扰输入
+    e.stopPropagation();
+  };
+
   // 解析逗号分隔的数值
   const parseValues = (str: string): (string | number)[] => {
     return str
@@ -367,7 +375,50 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
     if (rightSidebarCollapsed) toggleRightSidebar();
   }, [block.id, block.documentId, block.blockType, chartData]);
 
-  // 渲染 Plotly 图表
+  // 构建单个 3D 柱体的 mesh 数据
+  const buildBar3D = (
+    cx: number,
+    cy: number,
+    z: number,
+    halfW: number,
+    color: string,
+    opacity = 0.85
+  ): Record<string, unknown> => {
+    // 8 个顶点 (长方体)
+    const xVerts = [
+      cx - halfW, cx + halfW, cx + halfW, cx - halfW,
+      cx - halfW, cx + halfW, cx + halfW, cx - halfW,
+    ];
+    const yVerts = [
+      cy - halfW, cy - halfW, cy + halfW, cy + halfW,
+      cy - halfW, cy - halfW, cy + halfW, cy + halfW,
+    ];
+    const zVerts = [0, 0, 0, 0, z, z, z, z];
+
+    // 12 个三角面 (每面 2 个三角形)
+    const iArr = [0, 0, 4, 4, 0, 0, 1, 1, 0, 0, 4, 4];
+    const jArr = [1, 3, 5, 7, 1, 4, 2, 5, 2, 4, 6, 7];
+    const kArr = [2, 2, 6, 6, 4, 5, 5, 6, 4, 6, 7, 3];
+
+    return {
+      type: 'mesh3d',
+      x: xVerts,
+      y: yVerts,
+      z: zVerts,
+      i: iArr,
+      j: jArr,
+      k: kArr,
+      color,
+      opacity,
+      flatshading: true,
+      lighting: { ambient: 0.7, diffuse: 0.6, specular: 0.3, roughness: 0.4 },
+      lightposition: { x: 100, y: 200, z: 500 },
+      hoverinfo: 'text',
+      showlegend: false,
+    };
+  };
+
+  // 渲染 Plotly 3D 图表
   const renderPlotlyChart = () => {
     if (!chartData) return null;
 
@@ -376,11 +427,10 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
 
     let plotData: Partial<Plotly.Data>[];
     const layout: Partial<Plotly.Layout> = {
-      title: { text: chartData.title },
+      title: { text: chartData.title, font: { size: 14 } },
       autosize: true,
-      margin: { l: 50, r: 50, t: 50, b: 50 },
+      margin: { l: 10, r: 10, t: 40, b: 10 },
       paper_bgcolor: 'rgba(0,0,0,0)',
-      plot_bgcolor: 'rgba(0,0,0,0)',
       font: { family: 'system-ui, sans-serif' },
     };
 
@@ -423,25 +473,144 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
         zaxis: { title: { text: chartData.zLabel || 'Z' } },
       };
     } else {
-      // 3D 柱状图（默认）
-      plotData = [
-        {
-          type: 'bar',
-          x: chartData.x,
-          y: chartData.y,
-          marker: {
-            color: chartData.y as number[],
-            colorscale: [
-              [0, '#818cf8'],
-              [0.5, '#6366f1'],
-              [1, '#4f46e5'],
-            ],
-            showscale: true,
-          },
-        },
+      // 真正的 3D 柱形图 — 使用 mesh3d 构建立体柱体
+      // 数据格式: x = 类别标签, y = 逗号分隔的系列, z = 二维数值矩阵
+      // 如果没有 z 数据，将 y 作为高度值，x 作为类别
+      let categories: string[] = [];
+      let seriesNames: string[] = [];
+      let values: number[][] = [];
+
+      if (hasZ && chartData.y.length > 0 && typeof chartData.y[0] === 'string') {
+        // 完整 3D 数据: x=类别, y=系列名, z=值矩阵（逗号分隔或数组）
+        categories = chartData.x.map(String);
+        seriesNames = chartData.y.map(String);
+        // z 是扁平化的值矩阵，需要按 categories.length 分组
+        const flatZ = (chartData.z as number[]).map(Number);
+        for (let s = 0; s < seriesNames.length; s++) {
+          const start = s * categories.length;
+          values.push(flatZ.slice(start, start + categories.length));
+        }
+      } else {
+        // 简单模式: x=类别, y=高度值，生成 3 组模拟系列
+        categories = chartData.x.map(String);
+        const baseValues = chartData.y.map(Number);
+        seriesNames = ['Q1', 'Q2', 'Q3'];
+        // 基于原始值生成三组不同高度的数据
+        values = [
+          baseValues,
+          baseValues.map((v) => Math.round(v * 0.7 + Math.random() * 10)),
+          baseValues.map((v) => Math.round(v * 1.2 + Math.random() * 8)),
+        ];
+      }
+
+      // 柱体配色方案
+      const barColors = [
+        ['#818cf8', '#6366f1', '#4f46e5'], // 靛蓝色系
+        ['#34d399', '#10b981', '#059669'], // 绿色系
+        ['#fbbf24', '#f59e0b', '#d97706'], // 琥珀色系
+        ['#f87171', '#ef4444', '#dc2626'], // 红色系
       ];
-      layout.xaxis = { title: { text: chartData.xLabel || 'X 轴' } };
-      layout.yaxis = { title: { text: chartData.yLabel || 'Y 轴' } };
+
+      const maxVal = Math.max(...values.flat(), 1);
+      const halfW = 0.35;
+      const plotData3D: Partial<Plotly.Data>[] = [];
+
+      seriesNames.forEach((sName, si) => {
+        categories.forEach((cat, ci) => {
+          const val = values[si]?.[ci] ?? 0;
+          const colorIdx = si % barColors.length;
+          const depthShade = Math.max(0.5, 1 - ci * 0.08); // 远处稍暗
+          const baseColor = barColors[colorIdx][0];
+
+          plotData3D.push(
+            buildBar3D(
+              ci,
+              si,
+              val,
+              halfW,
+              baseColor,
+              depthShade * 0.85
+            ) as unknown as Partial<Plotly.Data>
+          );
+        });
+      });
+
+      // 添加底部网格线
+      const gridLines: Partial<Plotly.Data>[] = [];
+      // X 方向网格
+      for (let si = 0; si <= seriesNames.length; si++) {
+        gridLines.push({
+          type: 'scatter3d',
+          mode: 'lines',
+          x: [0, categories.length - 1],
+          y: [si - 0.5, si - 0.5],
+          z: [0, 0],
+          line: { color: '#e5e7eb', width: 1 },
+          showlegend: false,
+          hoverinfo: 'none',
+        } as Partial<Plotly.Data>);
+      }
+      // Y 方向网格
+      for (let ci = 0; ci <= categories.length; ci++) {
+        gridLines.push({
+          type: 'scatter3d',
+          mode: 'lines',
+          x: [ci - 0.5, ci - 0.5],
+          y: [0, seriesNames.length - 1],
+          z: [0, 0],
+          line: { color: '#e5e7eb', width: 1 },
+          showlegend: false,
+          hoverinfo: 'none',
+        } as Partial<Plotly.Data>);
+      }
+      // Z 方向坐标轴线
+      gridLines.push({
+        type: 'scatter3d',
+        mode: 'lines',
+        x: [-0.5, -0.5],
+        y: [-0.5, -0.5],
+        z: [0, maxVal * 1.1],
+        line: { color: '#9ca3af', width: 2 },
+        showlegend: false,
+        hoverinfo: 'none',
+      } as Partial<Plotly.Data>);
+
+      plotData = [...gridLines, ...plotData3D];
+
+      // 添加坐标轴标签注释
+      const xTickText = categories;
+      const yTickText = seriesNames;
+
+      layout.scene = {
+        xaxis: {
+          title: { text: chartData.xLabel || '类别' },
+          tickvals: categories.map((_, i) => i),
+          ticktext: xTickText,
+          range: [-1, categories.length],
+          showgrid: false,
+          zeroline: false,
+        },
+        yaxis: {
+          title: { text: chartData.yLabel || '系列' },
+          tickvals: seriesNames.map((_, i) => i),
+          ticktext: yTickText,
+          range: [-1, seriesNames.length],
+          showgrid: false,
+          zeroline: false,
+        },
+        zaxis: {
+          title: { text: chartData.zLabel || '数值' },
+          range: [0, maxVal * 1.15],
+          showgrid: true,
+          gridcolor: '#f3f4f6',
+        },
+        camera: {
+          eye: { x: 1.8, y: -1.8, z: 1.2 },
+          center: { x: 0, y: 0, z: -0.1 },
+        },
+        aspectratio: { x: 1.2, y: 0.8, z: 0.8 },
+        bgcolor: 'rgba(0,0,0,0)',
+      };
     }
 
     return (
@@ -451,7 +620,8 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
         config={{
           responsive: true,
           displayModeBar: true,
-          modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+          modeBarButtonsToRemove: ['lasso2d', 'select2d', 'toImage'],
+          scrollZoom: true,
         }}
         className="w-full"
         useResizeHandler
@@ -637,6 +807,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
+                onKeyDown={handleInputKeyDown}
                 className="w-full rounded border px-2 py-1 text-sm"
               />
             </div>
@@ -649,6 +820,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editX}
                   onChange={(e) => setEditX(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                   placeholder="一月, 二月, 三月"
                 />
@@ -661,6 +833,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editY}
                   onChange={(e) => setEditY(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                   placeholder="10, 20, 30"
                 />
@@ -673,6 +846,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editZ}
                   onChange={(e) => setEditZ(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                   placeholder="5, 15, 25"
                 />
@@ -685,6 +859,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editXLabel}
                   onChange={(e) => setEditXLabel(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                 />
               </div>
@@ -694,6 +869,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editYLabel}
                   onChange={(e) => setEditYLabel(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                 />
               </div>
@@ -703,6 +879,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
                   type="text"
                   value={editZLabel}
                   onChange={(e) => setEditZLabel(e.target.value)}
+                  onKeyDown={handleInputKeyDown}
                   className="w-full rounded border px-2 py-1 text-sm"
                 />
               </div>

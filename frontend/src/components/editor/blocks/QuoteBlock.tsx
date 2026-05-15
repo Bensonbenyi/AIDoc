@@ -27,6 +27,7 @@ export function QuoteBlock({ block, onUpdate }: Props) {
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLQuoteElement>) => {
       if (event.key !== 'Enter') return;
+      if (event.nativeEvent.isComposing) return;
 
       event.preventDefault();
       commitText();

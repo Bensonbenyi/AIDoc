@@ -229,7 +229,10 @@ export function isBlockEmpty(block: DocumentBlock, container?: HTMLElement | nul
     case 'whiteboard':
       return !Array.isArray(block.content.paths) || block.content.paths.length === 0;
     case 'chart3d':
-      return !Array.isArray(block.content.bars) || block.content.bars.length === 0;
+      return (
+        (!Array.isArray(block.content.x) || (block.content.x as unknown[]).length === 0) &&
+        (!Array.isArray(block.content.bars) || (block.content.bars as unknown[]).length === 0)
+      );
     default:
       return false;
   }

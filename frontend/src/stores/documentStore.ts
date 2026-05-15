@@ -80,11 +80,13 @@ function defaultBlockContent(blockType: string): Record<string, unknown> {
     case 'chart3d':
       return {
         title: '3D 数据图表',
-        bars: [
-          { label: 'A', height: 80 },
-          { label: 'B', height: 130 },
-          { label: 'C', height: 100 },
-        ],
+        chartType: 'bar',
+        x: ['类别A', '类别B', '类别C'],
+        y: ['系列1', '系列2', '系列3'],
+        z: [80, 130, 100, 95, 150, 120, 110, 140, 85],
+        xLabel: 'X 轴',
+        yLabel: 'Y 轴',
+        zLabel: '数值',
       };
     case 'ai-answer':
       return { text: 'AI 生成内容会显示在这里。' };

@@ -93,7 +93,7 @@ export function SlashCommandMenu() {
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setHighlightIdx((i) => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter' && flatItems[activeHighlightIdx]) {
+      } else if (e.key === 'Enter' && flatItems[activeHighlightIdx] && !e.isComposing) {
         e.preventDefault();
         insertBlock(flatItems[activeHighlightIdx].id);
       }

@@ -34,6 +34,7 @@ export function HeadingBlock({ block, level, onUpdate }: Props) {
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLHeadingElement>) => {
       if (event.key !== 'Enter') return;
+      if (event.nativeEvent.isComposing) return;
 
       event.preventDefault();
       commitText();
