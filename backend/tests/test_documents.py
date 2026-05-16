@@ -7,6 +7,8 @@ import uuid
 import pytest
 from httpx import AsyncClient
 
+from app.models.document import Document
+
 
 @pytest.mark.asyncio
 async def test_create_document(client: AsyncClient):
@@ -172,6 +174,28 @@ async def test_delete_document_cascades_to_children(client: AsyncClient):
     # 文档树中不应出现已删除的文档
     tree = (await client.get("/api/documents/tree")).json()
     assert len(tree) == 0
+
+
+@pytest.mark.asyncio
+async def test_orm_delete_document_does_not_hard_delete_children(
+    client: AsyncClient, db_session
+):
+    """防止 ORM children cascade 绕过业务软删除并硬删子文档"""
+    parent = (await client.post("/api/documents", json={"title": "父"})).json()
+    child = (
+        await client.post(
+            "/api/documents",
+            json={"title": "子", "parent_id": parent["id"]},
+        )
+    ).json()
+
+    parent_doc = await db_session.get(Document, uuid.UUID(parent["id"]))
+    await db_session.delete(parent_doc)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/documents/{child['id']}")
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "子"
 
 
 @pytest.mark.asyncio

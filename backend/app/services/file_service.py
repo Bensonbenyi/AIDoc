@@ -205,23 +205,69 @@ async def _save_to_local(content: bytes, filename: str) -> str:
 
 
 # ==============================
-# S3 存储实现（占位）
+# S3 存储实现（兼容 Supabase Storage）
 # ==============================
 
+def _get_s3_client():
+    """获取 S3 客户端"""
+    import boto3
+    kwargs = {
+        "aws_access_key_id": settings.S3_ACCESS_KEY,
+        "aws_secret_access_key": settings.S3_SECRET_KEY,
+        "region_name": settings.S3_REGION,
+    }
+    if settings.S3_ENDPOINT:
+        kwargs["endpoint_url"] = settings.S3_ENDPOINT
+    return boto3.client("s3", **kwargs)
+
+
 async def _save_to_s3(content: bytes, filename: str, content_type: str | None) -> str:
-    """保存文件到 S3（待实现）"""
-    # TODO: 实现 S3 上传
-    raise NotImplementedError("S3 存储尚未实现")
+    """保存文件到 S3"""
+    import asyncio
+
+    def _upload():
+        client = _get_s3_client()
+        extra_args = {}
+        if content_type:
+            extra_args["ContentType"] = content_type
+        client.put_object(
+            Bucket=settings.S3_BUCKET,
+            Key=filename,
+            Body=content,
+            **extra_args,
+        )
+
+    await asyncio.to_thread(_upload)
+    logger.info(f"文件已上传到 S3: {filename}")
+    return filename
 
 
 async def _get_s3_signed_url(file_url: str) -> str:
-    """获取 S3 签名 URL（待实现）"""
-    raise NotImplementedError("S3 存储尚未实现")
+    """获取 S3 签名 URL"""
+    import asyncio
+
+    def _get_url():
+        client = _get_s3_client()
+        return client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": settings.S3_BUCKET, "Key": file_url},
+            ExpiresIn=3600,  # 1 小时有效期
+        )
+
+    url = await asyncio.to_thread(_get_url)
+    return url
 
 
 async def _delete_from_s3(file_url: str) -> None:
-    """从 S3 删除文件（待实现）"""
-    raise NotImplementedError("S3 存储尚未实现")
+    """从 S3 删除文件"""
+    import asyncio
+
+    def _delete():
+        client = _get_s3_client()
+        client.delete_object(Bucket=settings.S3_BUCKET, Key=file_url)
+
+    await asyncio.to_thread(_delete)
+    logger.info(f"文件已从 S3 删除: {file_url}")
 
 
 # ==============================

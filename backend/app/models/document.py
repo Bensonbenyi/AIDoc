@@ -32,7 +32,7 @@ class Document(Base):
 
     # Relationships
     children: Mapped[list["Document"]] = relationship(
-        "Document", back_populates="parent", cascade="all, delete-orphan"
+        "Document", back_populates="parent", cascade="save-update, merge"
     )
     parent: Mapped["Document | None"] = relationship(
         "Document", back_populates="children", remote_side=[id]

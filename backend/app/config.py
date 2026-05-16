@@ -63,6 +63,14 @@ class Settings(BaseSettings):
         default=None,
         description="S3 Secret Key"
     )
+    S3_ENDPOINT: Optional[str] = Field(
+        default=None,
+        description="S3 兼容服务地址（如 Supabase Storage）"
+    )
+    S3_REGION: str = Field(
+        default="ap-southeast-1",
+        description="S3 区域"
+    )
 
     # 代码执行配置
     CODE_EXECUTION_MODE: str = Field(
@@ -90,6 +98,10 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(
         default="INFO",
         description="日志等级: DEBUG / INFO / WARNING / ERROR / CRITICAL"
+    )
+    LOG_TO_FILE: bool = Field(
+        default=False,
+        description="是否写入日志文件（Render 等平台应设为 false）"
     )
 
     model_config = {

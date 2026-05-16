@@ -15,12 +15,16 @@ from app.config import settings
 
 
 # 创建异步 SQLAlchemy 引擎
+# Supabase Transaction mode (端口 6543) 不支持 prepared statements，
+# 需要设置 prepared_statement_cache_size=0
+# Supabase Session mode (端口 5432) 则无需此设置
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,  # 设置为 True 可以打印 SQL 语句
-    pool_size=20,  # 连接池大小
-    max_overflow=10,  # 超出连接池大小外最多创建的连接数
-    pool_pre_ping=True,  # 每次从连接池中取连接时，自动检测连接是否有效
+    echo=False,
+    pool_size=5,  # Render/Supabase 免费版连接数有限，适当缩小
+    max_overflow=5,
+    pool_pre_ping=True,
+    connect_args={"prepared_statement_cache_size": 0},
 )
 
 # 创建异步会话工厂

@@ -4,7 +4,9 @@ AI 对话 API 路由
 提供普通对话、文档问答、会话管理、上下文构建等接口
 """
 
+import json
 import uuid
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -13,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
+from app.database import async_session_maker
 from app.schemas.ai import (
     AIChatRequest,
     AIContextRequest,
@@ -177,24 +180,24 @@ async def chat(
 @router.post("/chat/stream", summary="流式 AI 对话")
 async def chat_stream(
     request: AIChatRequest,
-    db: AsyncSession = Depends(get_db),
 ):
     """
     流式 AI 对话（SSE）
 
     返回 Server-Sent Events 流
     """
-    if not request.session_id:
-        session = await ai_service.create_session(db)
-        session_id = session.id
-    else:
-        session_id = request.session_id
-        session = await ai_service.get_session(db, session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="会话不存在")
+    async with async_session_maker() as db:
+        if not request.session_id:
+            session = await ai_service.create_session(db)
+            session_id = session.id
+        else:
+            session_id = request.session_id
+            session = await ai_service.get_session(db, session_id)
+            if not session:
+                raise HTTPException(status_code=404, detail="会话不存在")
 
     return StreamingResponse(
-        ai_service.stream_chat(db, session_id, request.message),
+        _stream_chat_events(session_id, request.message, request.context),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -202,6 +205,25 @@ async def chat_stream(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+async def _stream_chat_events(
+    session_id: uuid.UUID,
+    message: str,
+    context: str | None = None,
+) -> AsyncGenerator[str, None]:
+    """使用 SSE 生成器自有的 session，避免依赖 session 生命周期不匹配。"""
+    async with async_session_maker() as db:
+        try:
+            async for event in ai_service.stream_chat(
+                db, session_id, message, context=context
+            ):
+                yield event
+        except Exception as e:
+            await db.rollback()
+            logger.exception(f"流式 AI 对话失败: session={session_id}, error={e}")
+            payload = {"type": "error", "message": "AI 对话失败，请稍后重试"}
+            yield f"data: {json.dumps(payload, ensure_ascii=False)}\n\n"
 
 
 # ==============================

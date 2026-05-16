@@ -22,14 +22,19 @@ logger.add(
     format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
     colorize=True,
 )
-logger.add(
-    "logs/app.log",
-    level=settings.LOG_LEVEL,
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    rotation="10 MB",  # 日志文件大小超过 10MB 时轮转
-    retention="7 days",  # 保留 7 天的日志
-    compression="zip",  # 压缩旧日志
-)
+
+# 文件日志仅在本地环境启用（Render 等平台文件系统不持久化）
+if settings.LOG_TO_FILE:
+    import os
+    os.makedirs("logs", exist_ok=True)
+    logger.add(
+        "logs/app.log",
+        level=settings.LOG_LEVEL,
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
+        rotation="10 MB",
+        retention="7 days",
+        compression="zip",
+    )
 
 
 @asynccontextmanager
@@ -72,13 +77,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# 配置 CORS 中间件
+# 配置 CORS 中间件（支持逗号分隔的多个 origin）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],  # 允许前端地址跨域
+    allow_origins=[origin.strip() for origin in settings.FRONTEND_URL.split(",")],
     allow_credentials=True,
-    allow_methods=["*"],  # 允许所有 HTTP 方法
-    allow_headers=["*"],  # 允许所有请求头
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
