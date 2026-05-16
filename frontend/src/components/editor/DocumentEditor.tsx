@@ -1,6 +1,7 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Loader2 } from 'lucide-react';
 import { useDocumentStore } from '@/stores/documentStore';
@@ -36,6 +37,10 @@ function BaseTextLine({ insertIndex, isLast }: BaseTextLineProps) {
   const [hasText, setHasText] = useState(false);
   const reactId = useId();
   const lineId = `base-line-${activeDocId}-${insertIndex}-${reactId}`;
+  const { isOver, setNodeRef } = useDroppable({
+    id: `editor-insert-${lineId}`,
+    data: { type: 'editor-insert', insertIndex },
+  });
 
   const openMenuForLine = useCallback(() => {
     const element = lineRef.current;
@@ -172,14 +177,19 @@ function BaseTextLine({ insertIndex, isLast }: BaseTextLineProps) {
 
   return (
     <div
-      ref={lineRef}
+      ref={(node) => {
+        lineRef.current = node;
+        setNodeRef(node);
+      }}
       data-base-line-index={insertIndex}
       data-editor-focus-target="true"
       data-placeholder={isLast ? '输入 / 选择模块' : undefined}
       contentEditable
       suppressContentEditableWarning
       className={`base-text-line rounded-md px-7 text-[15px] leading-relaxed outline-none whitespace-pre-wrap transition-[min-height,padding] ${
-        expanded ? 'min-h-6 py-1' : 'min-h-[2px] py-0'
+        expanded || isOver ? 'min-h-6 py-1' : 'min-h-[2px] py-0'
+      } ${
+        isOver ? 'bg-indigo-50 shadow-[inset_3px_0_0_#6366f1]' : ''
       }`}
       onKeyDown={handleKeyDown}
       onInput={handleInput}

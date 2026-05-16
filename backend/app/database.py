@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
 
+from fastapi import HTTPException
+
 from app.config import settings
 
 
@@ -45,6 +47,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
+        except HTTPException:
+            await session.rollback()
+            raise
         except Exception as e:
             import logging
             logging.error(f"数据库会话提交失败，正在回滚: {e}")

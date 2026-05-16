@@ -13,6 +13,7 @@ class AIScope(str, Enum):
 class AIChatRequest(BaseModel):
     session_id: uuid.UUID | None = Field(None, description="会话 ID，为空则创建新会话")
     message: str = Field(..., min_length=1, description="用户消息")
+    context: str | None = Field(None, description="可选引用上下文，会作为 system prompt 的文档上下文发送给 AI")
 
 
 class AIDocumentQARequest(BaseModel):

@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef, useCallback, useState } from 'react';
-import { useDroppable } from '@dnd-kit/core';
 import { useAppStore } from '@/stores/appStore';
 import { useDocumentStore } from '@/stores/documentStore';
 import { DocumentTree } from '@/components/sidebar/DocumentTree';
@@ -16,17 +15,8 @@ import {
 import { findDocPath } from '@/stores/documentStore';
 
 function EditorDropZone() {
-  const { isOver, setNodeRef } = useDroppable({
-    id: 'editor-drop',
-    data: { type: 'editor-drop' },
-  });
-
   return (
-    <div
-      ref={setNodeRef}
-      data-dropzone="editor"
-      className={`h-full ${isOver ? 'ring-2 ring-indigo-300 ring-inset rounded-lg' : ''}`}
-    >
+    <div className="h-full">
       <EditorContent />
     </div>
   );

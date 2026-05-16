@@ -2,11 +2,13 @@
 
 import {
   closestCenter,
+  CollisionDetection,
   DndContext,
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  pointerWithin,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -59,6 +61,68 @@ export function AppDndProvider({ children }: { children: React.ReactNode }) {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   );
 
+  // Tree documents should only drop on explicit insertion lines or the AI chat.
+  // Other drags keep closestCenter fallback so block sorting remains forgiving.
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    const activeType = args.active.data.current?.type;
+
+    if (activeType === 'file-to-editor') {
+      const chatCollisions = pointerCollisions.filter(
+        (collision) => collision.data?.droppableContainer?.data.current?.type === 'ai-chat'
+      );
+      const pointerCoordinates = args.pointerCoordinates;
+      const insertCollisions = pointerCoordinates
+        ? args.droppableContainers
+            .flatMap((droppableContainer) => {
+              if (droppableContainer.data.current?.type !== 'editor-insert') return [];
+
+              const rect = args.droppableRects.get(droppableContainer.id);
+              if (!rect) return [];
+
+              const verticalTolerance = 12;
+              const isWithinX =
+                pointerCoordinates.x >= rect.left && pointerCoordinates.x <= rect.right;
+              const isNearLine =
+                pointerCoordinates.y >= rect.top - verticalTolerance &&
+                pointerCoordinates.y <= rect.bottom + verticalTolerance;
+
+              if (!isWithinX || !isNearLine) return [];
+
+              return [
+                {
+                  id: droppableContainer.id,
+                  data: {
+                    droppableContainer,
+                    value: Math.abs(pointerCoordinates.y - (rect.top + rect.height / 2)),
+                  },
+                },
+              ];
+            })
+            .sort((a, b) => a.data.value - b.data.value)
+        : [];
+
+      return [...insertCollisions, ...chatCollisions];
+    }
+
+    if (activeType === 'block-reference') {
+      const blockPointerCollisions = pointerCollisions.filter(
+        (collision) => collision.data?.droppableContainer?.data.current?.type !== 'editor-insert'
+      );
+      if (blockPointerCollisions.length > 0) return blockPointerCollisions;
+
+      return closestCenter({
+        ...args,
+        droppableContainers: args.droppableContainers.filter(
+          (droppableContainer) => droppableContainer.data.current?.type !== 'editor-insert'
+        ),
+      });
+    }
+
+    if (pointerCollisions.length > 0) return pointerCollisions;
+    return closestCenter(args);
+  };
+
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setMounted(true));
     return () => window.cancelAnimationFrame(frame);
@@ -104,10 +168,10 @@ export function AppDndProvider({ children }: { children: React.ReactNode }) {
     // Tree item dragged to the editor becomes an internal document link/subpage block.
     if (
       activeData?.type === 'file-to-editor' &&
-      (overData?.type === 'editor-drop' || overData?.type === 'block-reference')
+      overData?.type === 'editor-insert'
     ) {
       const node = activeData.node;
-      const targetIndex = overData?.type === 'block-reference' ? blocks.findIndex((b) => b.id === over.id) : undefined;
+      const targetIndex = typeof overData.insertIndex === 'number' ? overData.insertIndex : undefined;
       addDocLinkBlock(node, activeDocId, targetIndex);
       return;
     }
@@ -133,7 +197,7 @@ export function AppDndProvider({ children }: { children: React.ReactNode }) {
   return mounted ? (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={collisionDetection}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}

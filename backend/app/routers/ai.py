@@ -150,8 +150,8 @@ async def chat(
         if not session:
             raise HTTPException(status_code=404, detail="会话不存在")
 
-    # 调用 AI 服务
-    result = await ai_service.chat(db, session_id, request.message)
+    # 调用 AI 服务。拖拽文档/Block 的引用上下文通过 context 进入 system prompt。
+    result = await ai_service.chat(db, session_id, request.message, context=request.context)
     await db.commit()
 
     # 构造引用列表

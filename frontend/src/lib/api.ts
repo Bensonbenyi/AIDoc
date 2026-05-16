@@ -610,8 +610,8 @@ export const aiAPI = {
     get(`/api/ai/documents/${documentId}/sessions`),
 
   /** 普通 AI 对话 */
-  chat: (sessionId: string | null, message: string): Promise<AIChatResponse> =>
-    post('/api/ai/chat', { sessionId, message }),
+  chat: (sessionId: string | null, message: string, context?: string): Promise<AIChatResponse> =>
+    post('/api/ai/chat', { sessionId, message, context }),
 
   /** 基于文档问答（支持拖拽上下文） */
   documentQA: (
