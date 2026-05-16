@@ -315,7 +315,7 @@ async def document_qa(
 
     - **document_id**: 文档 ID
     - **question**: 用户问题
-    - **scope**: 检索范围（current_document / document_tree / all_workspace）
+    - **scope**: 上下文范围（current_document / document_tree / all_workspace）
     - **context_document_id**: 拖拽的文档 ID（可选，直接读取其内容作为上下文）
     - **context_block_ids**: 拖拽的 block ID 列表（可选，读取这些 block 内容作为上下文）
 

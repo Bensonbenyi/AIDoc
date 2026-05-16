@@ -23,7 +23,7 @@ AIDoc 是一个 AI 原生交互式文档系统，类似 Notion/AFFiNE，集成�
 
 ### 后端
 - **框架**：FastAPI
-- **数据库**：PostgreSQL + pgvector
+- **数据库**：PostgreSQL
 - **ORM**：SQLAlchemy 2.0 (async)
 - **包管理**：uv
 - **AI 服务**：智谱 AI GLM-5.1
@@ -34,7 +34,7 @@ AIDoc 是一个 AI 原生交互式文档系统，类似 Notion/AFFiNE，集成�
 
 - Node.js 18+
 - Python 3.11+
-- PostgreSQL 14+（需支持 pgvector 扩展）
+- PostgreSQL 14+
 - Docker（用于代码执行功能）
 
 ### 1. 克隆项目
@@ -69,19 +69,6 @@ psql -U postgres
 
 # 创建数据库
 CREATE DATABASE aidoc;
-
-# 退出
-\q
-```
-
-#### 启用 pgvector 扩展
-
-```bash
-# 连接到 aidoc 数据库
-psql -U postgres -d aidoc
-
-# 启用向量扩展
-CREATE EXTENSION IF NOT EXISTS vector;
 
 # 退出
 \q
@@ -328,17 +315,11 @@ brew services start postgresql@14    # macOS
 sudo systemctl start postgresql      # Linux
 ```
 
-### 2. pgvector 扩展未启用
-
-```bash
-psql -U postgres -d aidoc -c "CREATE EXTENSION IF NOT EXISTS vector;"
-```
-
-### 3. AI 功能不可用
+### 2. AI 功能不可用
 
 确保在 `.env` 中配置了有效的 `LLM_API_KEY`。未配置时，AI 对话会返回错误提示，但其他功能正常。
 
-### 4. 代码执行功能不可用
+### 3. 代码执行功能不可用
 
 确保 Docker 已启动，并且已构建 `aidoc-python-runner` 镜像：
 

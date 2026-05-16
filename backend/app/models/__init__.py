@@ -4,8 +4,6 @@ from app.models.whiteboard_data import WhiteboardData
 from app.models.chart_3d import Chart3D
 from app.models.ai_chat import AIChatSession
 from app.models.ai_message import AIMessage
-from app.models.knowledge_chunk import KnowledgeChunk
-from app.models.document_summary import DocumentSummary
 from app.models.code_execution import CodeExecution
 from app.models.file_asset import FileAsset
 from app.models.system_log import SystemLog
@@ -17,8 +15,6 @@ __all__ = [
     "Chart3D",
     "AIChatSession",
     "AIMessage",
-    "KnowledgeChunk",
-    "DocumentSummary",
     "CodeExecution",
     "FileAsset",
     "SystemLog",

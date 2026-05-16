@@ -1,8 +1,7 @@
 """
 Block 文本转换工具
 
-将不同类型的 DocumentBlock 转换为可索引的纯文本。
-用于 RAG 检索系统的文本索引和 BM25 关键词检索。
+将不同类型的 DocumentBlock 转换为 AI 可读的纯文本上下文。
 """
 
 from typing import Any
@@ -10,14 +9,14 @@ from typing import Any
 
 def convert_block_to_text(block_type: str, content: dict[str, Any] | None) -> str:
     """
-    将 block 内容转换为可索引的纯文本
+    将 block 内容转换为纯文本
 
     Args:
         block_type: block 类型（后端格式，如 paragraph, heading_1 等）
         content: block 的 content 字段（JSON dict）
 
     Returns:
-        可索引的纯文本字符串
+        纯文本字符串
     """
     if not content:
         return ""
@@ -48,7 +47,7 @@ def convert_block_to_text(block_type: str, content: dict[str, Any] | None) -> st
         return f"引用：{content.get('text', '')}"
 
     if block_type == "divider":
-        return ""  # 分隔线不索引
+        return ""
 
     if block_type == "code":
         code = content.get("code", "")
@@ -104,36 +103,3 @@ def convert_block_to_text(block_type: str, content: dict[str, Any] | None) -> st
 
     # 未知类型，尝试返回 text 字段
     return content.get("text", "")
-
-
-def convert_block_to_bm25_text(block_type: str, content: dict[str, Any] | None) -> str:
-    """
-    将 block 内容转换为适合 BM25 关键词检索的文本
-
-    与 convert_block_to_text 类似，但去除格式标记，更适合关键词匹配。
-
-    Args:
-        block_type: block 类型
-        content: block 的 content 字段
-
-    Returns:
-        适合关键词检索的纯文本
-    """
-    text = convert_block_to_text(block_type, content)
-
-    # 去除 Markdown 格式标记
-    # 去除代码块标记
-    text = text.replace("```", "")
-    # 去除引用标记
-    text = text.replace("> ", "")
-    # 去除列表标记
-    lines = text.split("\n")
-    cleaned_lines = []
-    for line in lines:
-        line = line.strip()
-        if line.startswith("- "):
-            line = line[2:]
-        if line:
-            cleaned_lines.append(line)
-
-    return "\n".join(cleaned_lines)

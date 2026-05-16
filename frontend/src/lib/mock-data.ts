@@ -26,7 +26,6 @@ export const MOCK_TREE: DocumentTreeNode[] = [
     isOpen: false,
     children: [
       { id: 'frontend', icon: '🖥️', title: '前端架构', children: [] },
-      { id: 'rag', icon: '🔍', title: 'RAG 设计', children: [] },
       { id: 'code-exec', icon: '⚡', title: '代码执行方案', children: [] },
     ],
   },
@@ -77,9 +76,8 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '功能模块概览' }, sortOrder: 3, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['模块', '优先级', '状态', '负责人'], rows: [['文档编辑器', 'P0', '✅ 已完成', '前端组'], ['AI 侧边栏', 'P0', '🔄 进行中', 'AI 组'], ['代码执行', 'P1', '📋 规划中', '后端组'], ['3D 图表', 'P1', '📋 规划中', '可视化组'], ['白板绘制', 'P2', '📋 规划中', '前端组']] }, sortOrder: 4, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '技术架构' }, sortOrder: 5, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'quote', content: { text: '系统基于 Block-aware Hierarchical RAG 技术，能够理解文档结构并进行精准的内容检索和回答。' }, sortOrder: 6, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'text', content: { text: '前端采用 React + TypeScript 构建，编辑器基于 Block 编辑范式，支持多种内容块的插入和编辑。AI 能力通过后端 API 接入，支持流式输出和上下文感知。' }, sortOrder: 7, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'rag', icon: '🔍', title: 'RAG 设计' }, sortOrder: 8, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'quote', content: { text: '系统围绕 Block 编辑、AI 对话、代码执行和可视化能力构建，优先保证文档编辑链路稳定可靠。' }, sortOrder: 6, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'text', content: { text: '前端采用 React + TypeScript 构建，编辑器基于 Block 编辑范式，支持多种内容块的插入和编辑。AI 能力通过后端 API 接入，支持流式输出和文档上下文问答。' }, sortOrder: 7, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: 'Python 代码执行' }, sortOrder: 9, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'text', content: { text: '系统支持在文档中直接运行 Python 代码，类似 Jupyter Notebook 的体验，但完全嵌入在文档编辑流程中。' }, sortOrder: 10, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'code', content: { language: 'python', code: `import pandas as pd\nimport numpy as np\n\n# 创建示例数据\ndata = {\n    '月份': ['1月', '2月', '3月', '4月', '5月', '6月'],\n    '用户数': [1200, 1800, 2400, 3100, 4200, 5600],\n    '收入(万)': [45, 68, 92, 125, 168, 224]\n}\n\ndf = pd.DataFrame(data)\nprint("📊 月度增长数据：")\nprint(df.to_string(index=False))\nprint(f"\\n📈 用户增长率: {((5600-1200)/1200*100):.1f}%")` }, sortOrder: 11, createdAt: '', updatedAt: '' },
@@ -90,7 +88,7 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'text', content: { text: '白板功能允许用户在文档中直接绘制草图、流程图和手写笔记，支持画笔、橡皮、撤销等基础操作。' }, sortOrder: 16, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'whiteboard', content: { paths: [] }, sortOrder: 17, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: 'AI 文档问答' }, sortOrder: 18, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'text', content: { text: 'AI 侧边栏能够基于当前文档内容进行智能问答，支持多种检索范围，返回结果包含引用来源，点击引用可以定位到对应的文档块。' }, sortOrder: 19, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'text', content: { text: 'AI 侧边栏能够基于当前文档内容进行智能问答，支持文档和内容块引用，返回结果包含引用来源，点击引用可以定位到对应的文档块。' }, sortOrder: 19, createdAt: '', updatedAt: '' },
     ],
     needs: [
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '目标用户' }, sortOrder: 0, createdAt: '', updatedAt: '' },
@@ -99,7 +97,7 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '核心需求场景' }, sortOrder: 3, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'todo', content: { items: [{ text: '场景 1：快速创建结构化文档', done: true }, { text: '场景 2：在文档中运行代码并查看结果', done: true }, { text: '场景 3：基于文档内容进行 AI 问答', done: false }, { text: '场景 4：数据可视化与 3D 图表', done: false }] }, sortOrder: 4, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '竞品分析' }, sortOrder: 5, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['产品', '优势', '不足', '我们的差异'], rows: [['Notion', '编辑体验好、生态丰富', '无代码执行、AI 能力弱', '原生代码执行 + 深度 AI'], ['AFFiNE', '开源、本地优先', 'AI 集成不够深入', 'Block-aware RAG'], ['Jupyter', '代码执行强大', '非文档工具、协作弱', '文档 + 代码一体化'], ['Obsidian', '知识管理强', '无实时协作、无 AI', 'AI 原生 + 实时协作']] }, sortOrder: 6, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['产品', '优势', '不足', '我们的差异'], rows: [['Notion', '编辑体验好、生态丰富', '无代码执行、AI 能力弱', '原生代码执行 + 深度 AI'], ['AFFiNE', '开源、本地优先', 'AI 集成不够深入', '文档编辑 + AI 协作'], ['Jupyter', '代码执行强大', '非文档工具、协作弱', '文档 + 代码一体化'], ['Obsidian', '知识管理强', '无实时协作、无 AI', 'AI 原生 + 实时协作']] }, sortOrder: 6, createdAt: '', updatedAt: '' },
     ],
     features: [
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: 'Block 编辑器' }, sortOrder: 0, createdAt: '', updatedAt: '' },
@@ -107,8 +105,7 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'h3', content: { text: 'Block 类型清单' }, sortOrder: 2, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['Block 类型', '交互方式', '数据格式', '特殊能力'], rows: [['文本块', '直接编辑', '富文本', 'Markdown 快捷键'], ['Todo 块', '勾选切换', '布尔 + 文本', '进度统计'], ['表格块', '单元格编辑', '行列数据', '图表数据源'], ['代码块', '代码编辑器', 'Python 代码', '执行 + 输出'], ['白板块', '画布绘制', '路径数据', '展开/收起'], ['3D 图表块', '拖拽旋转', '3D 渲染', '多数据源']] }, sortOrder: 3, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: 'AI 集成方案' }, sortOrder: 4, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'text', content: { text: 'AI 能力是产品的核心差异化特性。通过 Block-aware Hierarchical RAG 技术，AI 能够理解文档的层级结构，提供精准的内容检索和智能问答。' }, sortOrder: 5, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'rag', icon: '🔍', title: 'RAG 设计文档' }, sortOrder: 6, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'text', content: { text: 'AI 能力是产品的核心差异化特性。当前阶段使用前端引用内容和当前文档内容作为上下文，避免在正常编辑流程中引入额外后台任务。' }, sortOrder: 5, createdAt: '', updatedAt: '' },
     ],
     demo: [
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '演示流程' }, sortOrder: 0, createdAt: '', updatedAt: '' },
@@ -122,7 +119,7 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '核心能力' }, sortOrder: 2, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'bullet', content: { items: ['Block 编辑：灵活的内容组织方式', '代码执行：在文档中直接运行 Python', '3D 图表：数据的立体可视化', 'AI 问答：基于文档内容的智能助手', '白板绘制：手绘草图和流程图'] }, sortOrder: 3, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '技术栈' }, sortOrder: 4, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['层级', '技术选型', '说明'], rows: [['前端框架', 'React + TypeScript', '组件化开发'], ['编辑器', 'Block 编辑范式', '参考 Notion 架构'], ['AI 引擎', 'RAG + LLM', 'Block-aware 检索'], ['代码执行', 'Pyodide / 沙箱', '浏览器端 Python'], ['3D 渲染', 'Three.js / CSS 3D', '图表可视化']] }, sortOrder: 5, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['层级', '技术选型', '说明'], rows: [['前端框架', 'React + TypeScript', '组件化开发'], ['编辑器', 'Block 编辑范式', '参考 Notion 架构'], ['AI 引擎', 'LLM API', '文档上下文问答'], ['代码执行', 'Pyodide / 沙箱', '浏览器端 Python'], ['3D 渲染', 'Three.js / CSS 3D', '图表可视化']] }, sortOrder: 5, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'design', icon: '🎨', title: '产品设计文档' }, sortOrder: 6, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'tech', icon: '💻', title: '技术实现文档' }, sortOrder: 7, createdAt: '', updatedAt: '' },
     ],
@@ -130,9 +127,8 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '系统架构' }, sortOrder: 0, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'text', content: { text: '系统采用前后端分离架构，前端负责渲染和交互，后端提供 AI 能力和数据持久化。' }, sortOrder: 1, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '核心模块' }, sortOrder: 2, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'bullet', content: { items: ['编辑器引擎：Block CRUD + 序列化', 'AI 代理：RAG 检索 + LLM 生成', '代码沙箱：Python 执行环境', '图表引擎：数据绑定 + 3D 渲染'] }, sortOrder: 3, createdAt: '', updatedAt: '' },
+      { id: uid(), documentId: docId, blockType: 'bullet', content: { items: ['编辑器引擎：Block CRUD + 序列化', 'AI 代理：文档上下文 + LLM 生成', '代码沙箱：Python 执行环境', '图表引擎：数据绑定 + 3D 渲染'] }, sortOrder: 3, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'frontend', icon: '🖥️', title: '前端架构' }, sortOrder: 4, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'rag', icon: '🔍', title: 'RAG 设计' }, sortOrder: 5, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'doclink', content: { targetDocId: 'code-exec', icon: '⚡', title: '代码执行方案' }, sortOrder: 6, createdAt: '', updatedAt: '' },
     ],
     frontend: [
@@ -140,15 +136,6 @@ export function createMockBlocks(docId: string): DocumentBlock[] {
       { id: uid(), documentId: docId, blockType: 'table', content: { headers: ['类别', '选型', '版本', '说明'], rows: [['框架', 'React', '18.x', '并发模式 + Suspense'], ['语言', 'TypeScript', '5.x', '类型安全'], ['状态', 'Zustand', '4.x', '轻量状态管理'], ['样式', 'Tailwind CSS', '3.x', '原子化 CSS'], ['构建', 'Next.js', '15.x', 'App Router']] }, sortOrder: 1, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '组件架构' }, sortOrder: 2, createdAt: '', updatedAt: '' },
       { id: uid(), documentId: docId, blockType: 'text', content: { text: '组件采用分层设计：原子组件 → 分子组件 → 有机体 → 模板 → 页面。每个 Block 类型对应一个独立的组件。' }, sortOrder: 3, createdAt: '', updatedAt: '' },
-    ],
-    rag: [
-      { id: uid(), documentId: docId, blockType: 'h2', content: { text: 'RAG 架构' }, sortOrder: 0, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'text', content: { text: '传统的 RAG 系统将文档视为纯文本进行检索，忽略了文档的结构信息。我们的 Block-aware RAG 能够理解文档的层级关系，提供更精准的检索结果。' }, sortOrder: 1, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'h2', content: { text: '核心创新' }, sortOrder: 2, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'bullet', content: { items: ['Block 级别向量化：每个 Block 独立向量化存储', '层级感知检索：考虑 Block 的父子关系', '上下文窗口：自动扩展到相关 Block', '引用溯源：精确定位到源 Block'] }, sortOrder: 3, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'h2', content: { text: '检索流程' }, sortOrder: 4, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'text', content: { text: '用户提问 → 查询理解 → Block 向量检索 → 层级扩展 → 上下文组装 → LLM 生成 → 引用标注' }, sortOrder: 5, createdAt: '', updatedAt: '' },
-      { id: uid(), documentId: docId, blockType: 'quote', content: { text: '关键创新：检索时不仅返回匹配的 Block，还自动扩展到其父级标题和相邻 Block，确保 AI 理解完整的上下文。' }, sortOrder: 6, createdAt: '', updatedAt: '' },
     ],
     'code-exec': [
       { id: uid(), documentId: docId, blockType: 'h2', content: { text: '执行环境' }, sortOrder: 0, createdAt: '', updatedAt: '' },
@@ -171,7 +158,6 @@ export const MOCK_DOC_META: Record<string, { icon: string; title: string; desc: 
   overview: { icon: '📋', title: '项目总览', desc: 'AI 原生交互式文档系统的项目概览和整体规划。' },
   tech: { icon: '💻', title: '技术实现', desc: '系统架构设计和技术实现方案。' },
   frontend: { icon: '🖥️', title: '前端架构', desc: '前端技术选型、组件设计和状态管理方案。' },
-  rag: { icon: '🔍', title: 'RAG 设计', desc: 'Block-aware Hierarchical RAG 技术方案。' },
   'code-exec': { icon: '⚡', title: '代码执行方案', desc: 'Python 代码执行的技术实现和安全方案。' },
 };
 
@@ -185,12 +171,12 @@ export const MOCK_AI_RESPONSES = [
     retrieval: '基于 5 个相关内容块生成',
   },
   {
-    text: '从技术架构角度看，系统采用前后端分离设计：\n\n- **前端**：React + TypeScript，基于 Block 编辑范式\n- **AI 引擎**：Block-aware Hierarchical RAG，能够理解文档结构\n- **代码执行**：浏览器端 Pyodide + 服务端 Docker 沙箱\n\n关键创新在于 RAG 系统能够感知文档的层级结构，不仅检索匹配的 Block，还会扩展到父级标题和相邻内容。',
+    text: '从技术架构角度看，系统采用前后端分离设计：\n\n- **前端**：React + TypeScript，基于 Block 编辑范式\n- **AI 引擎**：通过文档上下文调用 LLM\n- **代码执行**：浏览器端 Pyodide + 服务端 Docker 沙箱\n\n当前阶段重点是保证文档编辑、删除、保存和引用问答流程稳定。',
     citations: [
-      { docId: 'rag', blockId: 'innovation', path: 'RAG 设计 / 核心创新' },
+      { docId: 'tech', blockId: 'modules', path: '技术实现 / 核心模块' },
       { docId: 'frontend', blockId: 'stack', path: '前端架构 / 技术选型' },
     ],
-    retrieval: '已参考：当前文档、相邻内容、父级标题',
+    retrieval: '已参考：当前文档内容',
   },
   {
     text: '用户需求分析表明，目标用户主要包括产品经理、技术团队和数据分析师。核心需求场景包括：\n\n- 快速创建结构化文档\n- 在文档中运行代码并查看结果\n- 基于文档内容进行 AI 问答\n- 数据可视化与 3D 图表\n\n相比竞品（Notion、AFFiNE、Jupyter），我们的核心差异化在于**原生代码执行 + 深度 AI 集成**。',

@@ -42,34 +42,6 @@ class Settings(BaseSettings):
         description="使用的 LLM 模型名"
     )
 
-    # Embedding 服务配置（阿里 Qwen text-embedding-v4）
-    EMBEDDING_API_KEY: str = Field(
-        default="your_dashscope_api_key_here",
-        description="阿里 DashScope API Key"
-    )
-    EMBEDDING_BASE_URL: str = Field(
-        default="https://dashscope.aliyuncs.com/compatible-mode/v1",
-        description="Embedding 服务地址"
-    )
-    EMBEDDING_MODEL: str = Field(
-        default="text-embedding-v4",
-        description="Embedding 模型名称"
-    )
-
-    # Reranker 服务配置（可选）
-    RERANKER_API_KEY: Optional[str] = Field(
-        default=None,
-        description="Reranker 服务 API Key（可选）"
-    )
-    RERANKER_BASE_URL: Optional[str] = Field(
-        default=None,
-        description="Reranker 服务地址（可选）"
-    )
-    RERANKER_MODEL: Optional[str] = Field(
-        default=None,
-        description="Reranker 模型名称（可选）"
-    )
-
     # Redis 配置（可选）
     REDIS_URL: Optional[str] = Field(
         default=None,

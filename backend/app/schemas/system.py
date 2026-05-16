@@ -24,7 +24,7 @@ class SystemLogResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
-    log_type: str = Field(description="日志类型: ai_call, rag_search, code_execution, document_update, error")
+    log_type: str = Field(description="日志类型: ai_call, code_execution, document_update, error")
     message: str
     metadata_: dict | None = Field(None, alias="metadata_")
     created_at: datetime

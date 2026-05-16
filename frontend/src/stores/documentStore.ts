@@ -294,6 +294,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
 
   removeBlock: (blockId) => {
     const { blocks, currentDocId } = get();
+    if (!blocks.some((b) => b.id === blockId)) return;
+
     // 乐观更新：直接从本地状态移除
     const newBlocks = blocks.filter((b) => b.id !== blockId);
     set((s) => ({
@@ -306,8 +308,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           }
         : s.historyByDocId,
     }));
-    // 删除操作通过 batch_save 统一持久化，不单独调用 delete API
-    scheduleAutoSave(get);
+    // 删除需要立即落库，避免用户删除后立刻刷新时防抖保存尚未执行。
+    saveNow(get);
   },
 
   undoLastChange: (docId) => {
@@ -518,4 +520,12 @@ function scheduleAutoSave(get: () => DocumentState) {
   autoSaveTimer = setTimeout(() => {
     get().saveDocument();
   }, AUTO_SAVE_DELAY);
+}
+
+function saveNow(get: () => DocumentState) {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = null;
+  }
+  void get().saveDocument();
 }

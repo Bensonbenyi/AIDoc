@@ -184,7 +184,7 @@ async def create_blocks(session: AsyncSession, documents: dict):
                     "rows": [
                         ["前端", "Next.js + React", "用户界面框架"],
                         ["后端", "FastAPI + Python", "API 服务"],
-                        ["数据库", "PostgreSQL + pgvector", "数据存储和向量检索"],
+                        ["数据库", "PostgreSQL", "文档和业务数据存储"],
                         ["AI", "智谱 AI GLM-5.1", "大语言模型"],
                     ]
                 },

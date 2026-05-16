@@ -5,9 +5,8 @@
 功能：
 1. 连接 PostgreSQL 数据库
 2. 创建 aidoc 数据库（如不存在）
-3. 启用 vector 扩展
-4. 创建所有数据表
-5. 插入初始种子数据
+3. 创建所有数据表
+4. 插入初始种子数据
 """
 
 import asyncio
@@ -59,24 +58,6 @@ async def create_database_if_not_exists():
         raise
 
 
-async def enable_vector_extension():
-    """启用 pgvector 扩展"""
-    logger.info("正在启用 pgvector 扩展...")
-
-    try:
-        # 连接到 aidoc 数据库
-        conn = await asyncpg.connect(settings.DATABASE_URL.replace("postgresql+asyncpg", "postgresql"))
-
-        # 启用 vector 扩展
-        await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
-        logger.info("pgvector 扩展启用成功")
-
-        await conn.close()
-    except Exception as e:
-        logger.warning(f"pgvector 扩展不可用（将在 RAG 功能阶段安装）: {e}")
-        # 不抛出异常，继续执行
-
-
 async def create_tables():
     """创建所有数据表"""
     logger.info("正在创建数据表...")
@@ -85,7 +66,7 @@ async def create_tables():
         # 导入所有模型
         from app.models import (  # noqa: F401
             document, document_block, whiteboard_data, chart_3d,
-            ai_chat, ai_message, knowledge_chunk, document_summary,
+            ai_chat, ai_message,
             code_execution, file_asset, system_log,
         )
 
@@ -126,13 +107,10 @@ async def main():
         # 1. 创建数据库
         await create_database_if_not_exists()
 
-        # 2. 启用 vector 扩展
-        await enable_vector_extension()
-
-        # 3. 创建数据表
+        # 2. 创建数据表
         await create_tables()
 
-        # 4. 插入种子数据
+        # 3. 插入种子数据
         await insert_seed_data()
 
         logger.info("=" * 50)

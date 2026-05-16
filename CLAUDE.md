@@ -9,6 +9,8 @@ AIDoc is an AI-native interactive document system — a Notion/AFFiNE-like block
 
 **Current status**: 阶段 0-11 已完成。前端和后端均已实现并对接。前端使用真实 API 调用（非 mock 数据）。
 
+**Important**: This project uses Next.js 16, which has breaking changes from earlier versions. Before writing frontend code, check `frontend/node_modules/next/dist/docs/` for current APIs and conventions.
+
 ## Commands
 
 ### Frontend (from `frontend/` directory)
@@ -25,7 +27,9 @@ npm run lint     # ESLint
 ```bash
 uv sync                                    # Install dependencies
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000  # Start dev server
-uv run pytest tests/ -v                    # Run tests (18 tests)
+uv run pytest tests/ -v                    # Run all tests (uses SQLite in-memory, not PostgreSQL)
+uv run pytest tests/test_documents.py -v   # Run single test file
+uv run pytest tests/test_documents.py::test_create_document -v  # Run single test
 uv run python scripts/init_db.py           # Init DB + seed data
 uv run python scripts/seed_data.py         # Seed data only
 ```
@@ -48,7 +52,7 @@ Frontend (Next.js, port 3000)
     ↓ HTTP API calls
 Backend (FastAPI, port 8000)
     ↓ SQLAlchemy async
-PostgreSQL + pgvector
+PostgreSQL
 ```
 
 ### Three-Panel Layout (`AppLayout.tsx`)
@@ -97,7 +101,7 @@ backend/app/
 ├── services/            # Business logic layer
 ├── routers/             # API route handlers
 ├── prompts/             # LLM prompt templates (.txt files)
-└── utils/               # Logger, text splitter, block text converter
+└── utils/               # Logger, block text converter
 ```
 
 **API 路由组**:
@@ -131,18 +135,14 @@ backend/app/
 
 ## Key Decisions
 
-### RAG 系统：当前不启用
+### AI 文档问答：当前上下文方案
 
-项目中已预建 RAG 相关代码（`embedding_service.py`、`rag_service.py`、`bm25_service.py`、`reranker_service.py`、`summary_service.py`、`rag.py` 路由），但**当前阶段不启用**。
+当前阶段不包含额外派生内容构建流程。AI 问答使用前端引用内容和当前文档内容作为上下文，统一调用后端 AI 接口。
 
 **原因**:
-1. 前端直接提取上下文方案更简单可靠——用户拖拽 block 到 AI 聊天框时，前端从本地 store 读取 block 内容拼接到消息中
-2. 避免了后端 block 查找的时序问题（block 可能尚未保存到数据库）
-3. RAG 需要 embedding API 调用，会拖慢保存速度
-
-**当前 AI 问答方案**: 前端 `blockToText()` 提取 block 内容 → 拼接到用户消息 → 统一调用 `aiAPI.chat()` → 后端 prompt 识别"以下是引用的内容"前缀
-
-**未来升级路径**: 需要时取消 `main.py` 中 RAG 路由注册的注释即可启用
+1. 文档编辑、删除、保存链路必须保持轻量且确定
+2. 用户拖拽 block 或文档到 AI 聊天框时，前端可以直接提取上下文
+3. 后续需要相关能力时，应重新设计并独立实现，不能接入正常编辑事务
 
 ### 代码执行：Docker 后端执行
 
@@ -184,7 +184,6 @@ backend/app/
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/aidoc
 LLM_API_KEY=your_zhipu_api_key
 LLM_MODEL=glm-5.1
-EMBEDDING_MODEL=text-embedding-v4
 FRONTEND_URL=http://localhost:3000
 CODE_EXECUTION_MODE=docker
 FILE_STORAGE_TYPE=local

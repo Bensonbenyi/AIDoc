@@ -17,7 +17,7 @@ class SystemLog(Base):
     log_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
-        comment="ai_call, rag_search, code_execution, document_update, error",
+        comment="ai_call, code_execution, document_update, error",
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)

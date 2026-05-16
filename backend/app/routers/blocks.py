@@ -15,20 +15,6 @@ from app.services import block_service, whiteboard_service
 router = APIRouter()
 
 
-# [RAG 暂时禁用] 后台触发 RAG 索引更新
-# async def _trigger_rag_reindex(document_id: uuid.UUID):
-#     from app.services.rag_service import rag_service
-#     from app.database import async_session_maker
-#     from loguru import logger
-#     async with async_session_maker() as db:
-#         try:
-#             await rag_service.index_document(db, document_id)
-#             await db.commit()
-#         except Exception as e:
-#             logger.warning(f"RAG 索引更新失败: {e}")
-#             await db.rollback()
-
-
 @router.patch("/{block_id}", response_model=BlockResponse)
 async def update_block(
     block_id: uuid.UUID,

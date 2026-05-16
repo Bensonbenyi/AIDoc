@@ -19,12 +19,6 @@ from app.schemas.ai import (
     AIResponse,
     AIReference,
 )
-from app.schemas.rag import (
-    RAGReindexRequest,
-    RAGSearchRequest,
-    RAGSearchResult,
-    RAGSearchResponse,
-)
 from app.schemas.code_execution import CodeExecuteRequest, CodeExecuteResponse
 from app.schemas.chart import Chart3DCreateRequest, Chart3DResponse
 from app.schemas.file import FileUploadResponse
@@ -57,11 +51,6 @@ __all__ = [
     "AIDocumentQARequest",
     "AIResponse",
     "AIReference",
-    # RAG
-    "RAGReindexRequest",
-    "RAGSearchRequest",
-    "RAGSearchResult",
-    "RAGSearchResponse",
     # Code Execution
     "CodeExecuteRequest",
     "CodeExecuteResponse",

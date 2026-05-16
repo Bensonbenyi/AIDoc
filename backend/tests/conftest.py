@@ -52,8 +52,6 @@ async def setup_database():
             chart_3d,
             ai_chat,
             ai_message,
-            knowledge_chunk,
-            document_summary,
             code_execution,
             file_asset,
             system_log,

@@ -13,6 +13,8 @@ from app.models.document import Document
 from app.models.document_block import DocumentBlock
 from app.models.whiteboard_data import WhiteboardData
 from app.models.chart_3d import Chart3D
+from app.models.code_execution import CodeExecution
+from app.models.file_asset import FileAsset
 from app.schemas.block import BlockCreate, BlockUpdate
 
 VALID_BLOCK_TYPES = {
@@ -79,14 +81,7 @@ async def batch_save_blocks(
     ids_to_delete = [bid for bid in old_blocks_map if bid not in preserved_ids]
 
     if ids_to_delete:
-        # 删除要丢弃的 block 的关联数据
-        await db.execute(
-            delete(WhiteboardData).where(WhiteboardData.block_id.in_(ids_to_delete))
-        )
-        await db.execute(
-            delete(Chart3D).where(Chart3D.block_id.in_(ids_to_delete))
-        )
-        # 删除旧 block
+        await _delete_block_related_data(db, ids_to_delete)
         await db.execute(
             delete(DocumentBlock).where(DocumentBlock.id.in_(ids_to_delete))
         )
@@ -147,20 +142,36 @@ async def delete_block(db: AsyncSession, block_id: uuid.UUID) -> bool:
     if not block:
         raise ValueError("Block 不存在")
 
+    await _delete_block_related_data(db, [block_id])
+    await db.delete(block)
+    await db.flush()
+    return True
+
+
+async def _delete_block_related_data(
+    db: AsyncSession, block_ids: list[uuid.UUID]
+) -> None:
+    """删除 block 前清理所有会引用它的派生数据。"""
+    if not block_ids:
+        return
+
     # 删除关联的白板数据
     await db.execute(
-        delete(WhiteboardData).where(WhiteboardData.block_id == block_id)
+        delete(WhiteboardData).where(WhiteboardData.block_id.in_(block_ids))
     )
 
     # 删除关联的图表数据
     await db.execute(
-        delete(Chart3D).where(Chart3D.block_id == block_id)
+        delete(Chart3D).where(Chart3D.block_id.in_(block_ids))
     )
 
-    # 删除 block
-    await db.delete(block)
-    await db.flush()
-    return True
+    # 文件和代码执行记录也依附于 block；删除 block 时一并清理数据库记录。
+    await db.execute(
+        delete(FileAsset).where(FileAsset.block_id.in_(block_ids))
+    )
+    await db.execute(
+        delete(CodeExecution).where(CodeExecution.block_id.in_(block_ids))
+    )
 
 
 async def get_blocks_by_document(

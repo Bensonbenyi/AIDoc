@@ -26,7 +26,7 @@ async def log_to_db(
 
     Args:
         db: 数据库会话
-        log_type: 日志类型 (ai_call, rag_search, code_execution, document_update, error)
+        log_type: 日志类型 (ai_call, code_execution, document_update, error)
         message: 日志消息
         metadata: 附加元数据
 

@@ -10,7 +10,6 @@ dependencies = [
     "fastapi>=0.136.1",
     "httpx>=0.28.1",
     "loguru>=0.7.3",
-    "pgvector>=0.4.2",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "python-dotenv>=1.2.2",

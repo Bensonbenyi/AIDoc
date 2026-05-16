@@ -4,6 +4,7 @@
 创建异步 SQLAlchemy 引擎和会话工厂
 """
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
@@ -60,6 +61,10 @@ async def init_db() -> None:
     创建所有表（如果不存在）
     """
     async with engine.begin() as conn:
+        # 清理旧阶段遗留的派生表，避免继续通过外键影响文档编辑和删除事务。
+        await conn.execute(text("DROP TABLE IF EXISTS knowledge_chunks"))
+        await conn.execute(text("DROP TABLE IF EXISTS document_summaries"))
+
         # 导入所有模型，确保它们被注册到 Base.metadata
         from app.models import (  # noqa: F401
             document,
@@ -68,8 +73,6 @@ async def init_db() -> None:
             chart_3d,
             ai_chat,
             ai_message,
-            knowledge_chunk,
-            document_summary,
             code_execution,
             file_asset,
             system_log,

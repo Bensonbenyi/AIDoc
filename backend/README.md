@@ -1,6 +1,6 @@
 # AIDoc 后端
 
-AIDoc 项目的后端服务，基于 FastAPI + SQLAlchemy + PostgreSQL + pgvector。
+AIDoc 项目的后端服务，基于 FastAPI + SQLAlchemy + PostgreSQL。
 
 ## 环境要求
 
@@ -47,42 +47,6 @@ createuser -s postgres
 2. 安装时设置密码（默认用户为 postgres）
 3. 确保 PostgreSQL 服务已启动
 
-## 安装 pgvector 扩展
-
-### macOS (使用 Homebrew)
-
-```bash
-# 安装 pgvector
-brew install pgvector
-
-# 重启 PostgreSQL 服务
-brew services restart postgresql@16
-```
-
-### Ubuntu/Debian
-
-```bash
-# 安装 pgvector
-sudo apt install postgresql-16-pgvector
-
-# 重启 PostgreSQL 服务
-sudo systemctl restart postgresql
-```
-
-### 从源码编译
-
-```bash
-# 克隆 pgvector 仓库
-git clone https://github.com/pgvector/pgvector.git
-cd pgvector
-
-# 编译和安装
-make
-sudo make install
-
-# 重启 PostgreSQL 服务
-```
-
 ## 项目配置
 
 ### 1. 安装依赖
@@ -105,7 +69,6 @@ cp .env.example .env
 # 主要需要配置：
 # - DATABASE_URL: PostgreSQL 连接地址
 # - LLM_API_KEY: 智谱 AI API Key
-# - EMBEDDING_API_KEY: 阿里 DashScope API Key
 ```
 
 ### 3. 初始化数据库
@@ -117,9 +80,8 @@ uv run python scripts/init_db.py
 
 这个脚本会：
 1. 创建 `aidoc` 数据库（如果不存在）
-2. 启用 pgvector 扩展
-3. 创建所有数据表
-4. 插入示例种子数据
+2. 创建所有数据表
+3. 插入示例种子数据
 
 ## 启动服务
 
@@ -175,7 +137,6 @@ backend/
 - `PUT /api/documents/{id}/blocks` - 批量保存 blocks
 - `POST /api/ai/chat` - AI 对话
 - `POST /api/ai/document-qa` - 基于文档问答
-- `POST /api/rag/search` - RAG 检索
 
 ## 开发指南
 
@@ -211,11 +172,7 @@ uv run pytest -v
 
 检查 PostgreSQL 服务是否启动，以及 `.env` 文件中的 `DATABASE_URL` 是否正确。
 
-### 2. pgvector 扩展未找到
-
-确保已安装 pgvector 扩展，并重启 PostgreSQL 服务。
-
-### 3. 权限错误
+### 2. 权限错误
 
 确保 PostgreSQL 用户有创建数据库的权限，或手动创建 `aidoc` 数据库：
 
@@ -234,6 +191,5 @@ CREATE DATABASE aidoc;
 
 - [FastAPI 文档](https://fastapi.tiangolo.com/)
 - [SQLAlchemy 文档](https://docs.sqlalchemy.org/)
-- [pgvector 文档](https://github.com/pgvector/pgvector)
 - [项目技术文档](../../docs/tech.md)
 - [开发计划](../../docs/plan.md)

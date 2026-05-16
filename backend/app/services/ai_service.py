@@ -125,7 +125,7 @@ class AIService:
         Args:
             user_message: 用户消息
             history: 历史消息列表
-            context: 知识上下文（RAG 检索结果）
+            context: 文档上下文
         """
         messages = []
 
@@ -196,7 +196,7 @@ class AIService:
             db: 数据库会话
             session_id: 对话会话 ID
             message: 用户消息
-            context: 知识上下文（可选，用于文档问答）
+            context: 文档上下文（可选，用于文档问答）
 
         Returns:
             包含 answer, references, confidence 的字典
