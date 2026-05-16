@@ -2,7 +2,7 @@
 
 import { Columns3, Plus, Rows3, Sparkles, Trash2 } from 'lucide-react';
 import { DocumentBlock } from '@/types/block';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useAIChatStore } from '@/stores/aiChatStore';
 import { useAppStore } from '@/stores/appStore';
 
@@ -12,10 +12,20 @@ interface Props {
 }
 
 export function TableBlock({ block, onUpdate }: Props) {
-  const rawHeaders = (block.content.headers as string[]) || [];
-  const headers = rawHeaders.length > 0 ? rawHeaders : ['列 1'];
-  const rawRows = (block.content.rows as string[][]) || [];
-  const rows = rawRows.length > 0 ? rawRows : [headers.map(() => '')];
+  const headers = useMemo(
+    () => {
+      const rawHeaders = (block.content.headers as string[]) || [];
+      return rawHeaders.length > 0 ? rawHeaders : ['列 1'];
+    },
+    [block.content.headers]
+  );
+  const rows = useMemo(
+    () => {
+      const rawRows = (block.content.rows as string[][]) || [];
+      return rawRows.length > 0 ? rawRows : [headers.map(() => '')];
+    },
+    [block.content.rows, headers]
+  );
 
   const askAI = useCallback(() => {
     const askAIWithQuestion = useAIChatStore.getState().askAIWithQuestion;

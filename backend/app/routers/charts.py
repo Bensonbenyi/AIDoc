@@ -6,10 +6,11 @@
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.dependencies import get_db
+from app.models.document_block import DocumentBlock
 from app.schemas.chart import Chart3DCreateRequest, Chart3DResponse
 from app.services import chart_service
 
@@ -107,7 +108,11 @@ async def update_chart(
         raise HTTPException(status_code=404, detail=str(e))
 
 
-@router.get("/by-block/{block_id}", response_model=Chart3DResponse)
+@router.get(
+    "/by-block/{block_id}",
+    response_model=Chart3DResponse,
+    responses={204: {"description": "该 chart_3d block 尚未保存独立图表数据"}},
+)
 async def get_chart_by_block(
     block_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -115,7 +120,12 @@ async def get_chart_by_block(
     """根据 block_id 获取 3D 图表数据"""
     chart = await chart_service.get_chart_by_block(db, block_id)
     if not chart:
-        raise HTTPException(status_code=404, detail="该 block 没有关联的图表数据")
+        block = await db.get(DocumentBlock, block_id)
+        if not block:
+            raise HTTPException(status_code=404, detail="Block 不存在")
+        if block.block_type != "chart_3d":
+            raise HTTPException(status_code=400, detail="Block 类型不是 chart_3d")
+        return Response(status_code=204)
 
     return Chart3DResponse(
         chart_id=chart.id,

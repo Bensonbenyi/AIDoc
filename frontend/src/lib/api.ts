@@ -140,7 +140,7 @@ async function request<T>(
 
     // 处理 204 No Content
     if (response.status === 204) {
-      return {} as T;
+      return null as T;
     }
 
     // 解析 JSON 响应，自动转换 snake_case → camelCase 和 block_type
@@ -405,7 +405,7 @@ export const chartsAPI = {
     patch(`/api/charts/${chartId}`, data),
 
   /** 根据 block_id 获取图表数据 */
-  getByBlock: (blockId: string): Promise<Chart3DResponse> =>
+  getByBlock: (blockId: string): Promise<Chart3DResponse | null> =>
     get(`/api/charts/by-block/${blockId}`),
 
   /** 根据 block_id 保存或更新图表数据 */

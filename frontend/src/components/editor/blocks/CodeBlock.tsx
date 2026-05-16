@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { DocumentBlock } from '@/types/block';
 import { Play, Check, X, Loader2, RotateCw, Sparkles } from 'lucide-react';
@@ -22,24 +22,37 @@ interface Props {
 const MIN_EDITOR_HEIGHT = 120;
 const MAX_EDITOR_HEIGHT = 320;
 
+type CodeStatus = 'idle' | 'running' | 'success' | 'error';
+
+interface CodeBlockState {
+  sourceContent: Record<string, unknown>;
+  code: string;
+  output?: string;
+  stderr?: string;
+  status: CodeStatus;
+  execTime?: string;
+}
+
+function getCodeBlockState(content: Record<string, unknown>): CodeBlockState {
+  return {
+    sourceContent: content,
+    code: (content.code as string) || '',
+    output: content.output as string | undefined,
+    stderr: content.stderr as string | undefined,
+    status: (content.status as CodeStatus) || 'idle',
+    execTime: content.executionTime as string | undefined,
+  };
+}
+
 export function CodeBlock({ block, onUpdate }: Props) {
-  const [code, setCode] = useState((block.content.code as string) || '');
-  const [output, setOutput] = useState(block.content.output as string | undefined);
-  const [stderr, setStderr] = useState(block.content.stderr as string | undefined);
-  const [status, setStatus] = useState<'idle' | 'running' | 'success' | 'error'>(
-    (block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle'
-  );
-  const [execTime, setExecTime] = useState(block.content.executionTime as string | undefined);
+  const [state, setState] = useState(() => getCodeBlockState(block.content));
   const [editorHeight, setEditorHeight] = useState(MIN_EDITOR_HEIGHT);
 
-  // 当 block.content 从外部更新时同步本地状态
-  useEffect(() => {
-    setCode((block.content.code as string) || '');
-    setOutput(block.content.output as string | undefined);
-    setStderr(block.content.stderr as string | undefined);
-    setStatus((block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle');
-    setExecTime(block.content.executionTime as string | undefined);
-  }, [block.content]);
+  if (state.sourceContent !== block.content) {
+    setState(getCodeBlockState(block.content));
+  }
+
+  const { code, output, stderr, status, execTime } = state;
 
   const askAI = useCallback(() => {
     const addPendingAttachment = useAIChatStore.getState().addPendingAttachment;
@@ -70,10 +83,13 @@ export function CodeBlock({ block, onUpdate }: Props) {
   const runCode = useCallback(async () => {
     if (!code.trim()) return;
 
-    setStatus('running');
-    setOutput(undefined);
-    setStderr(undefined);
-    setExecTime(undefined);
+    setState((current) => ({
+      ...current,
+      output: undefined,
+      stderr: undefined,
+      status: 'running',
+      execTime: undefined,
+    }));
 
     try {
       const result = await codeExecutionAPI.execute({
@@ -89,10 +105,13 @@ export function CodeBlock({ block, onUpdate }: Props) {
 
       const resultStatus = result.status === 'timeout' ? 'error' : result.status as 'success' | 'error';
 
-      setStatus(resultStatus);
-      setOutput(result.stdout || undefined);
-      setStderr(result.stderr || undefined);
-      setExecTime(timeStr);
+      setState((current) => ({
+        ...current,
+        output: result.stdout || undefined,
+        stderr: result.stderr || undefined,
+        status: resultStatus,
+        execTime: timeStr,
+      }));
 
       onUpdate({
         ...block.content,
@@ -103,9 +122,14 @@ export function CodeBlock({ block, onUpdate }: Props) {
         executionTime: timeStr || '',
       });
     } catch (err) {
-      setStatus('error');
       const errorMsg = err instanceof Error ? err.message : '执行请求失败';
-      setStderr(errorMsg);
+      setState((current) => ({
+        ...current,
+        output: undefined,
+        stderr: errorMsg,
+        status: 'error',
+        execTime: undefined,
+      }));
       onUpdate({
         ...block.content,
         code,
@@ -120,18 +144,18 @@ export function CodeBlock({ block, onUpdate }: Props) {
   const handleCodeChange = useCallback(
     (value: string | undefined) => {
       const newCode = value ?? '';
-      setCode(newCode);
-      // 代码变更时重置执行状态
-      if (status !== 'idle') {
-        setStatus('idle');
-        setOutput(undefined);
-        setStderr(undefined);
-        setExecTime(undefined);
-      }
+      setState((current) => ({
+        ...current,
+        code: newCode,
+        status: 'idle',
+        output: undefined,
+        stderr: undefined,
+        execTime: undefined,
+      }));
       // 同步更新 block content（不触发执行状态保存）
       onUpdate({ ...block.content, code: newCode, status: 'idle', output: '', stderr: '', executionTime: '' });
     },
-    [block.content, onUpdate, status]
+    [block.content, onUpdate]
   );
 
   const statusConfig = {

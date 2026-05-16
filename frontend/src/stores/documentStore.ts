@@ -515,8 +515,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     };
 
     set((s) => {
-      const { [docId]: _removedDoc, ...restDocs } = s.documentsById;
-      const { [docId]: _removedHistory, ...restHistory } = s.historyByDocId;
+      const restDocs = { ...s.documentsById };
+      const restHistory = { ...s.historyByDocId };
+      delete restDocs[docId];
+      delete restHistory[docId];
       return {
         tree: removeNodeFromTree(s.tree),
         documentsById: restDocs,

@@ -40,6 +40,61 @@ interface WhiteboardData {
   updatedAt: string;
 }
 
+interface WhiteboardToolbarProps {
+  tool: Tool;
+  onSelectTool: (tool: Tool) => void;
+  onUndo: () => void;
+  onRedo: () => void;
+}
+
+function WhiteboardToolbar({
+  tool,
+  onSelectTool,
+  onUndo,
+  onRedo,
+}: WhiteboardToolbarProps) {
+  return (
+    <div className="flex items-center gap-0.5">
+      <button
+        onClick={() => onSelectTool('pen')}
+        className={`p-1 rounded text-xs ${
+          tool === 'pen'
+            ? 'bg-indigo-100 text-indigo-600'
+            : 'text-muted-foreground hover:bg-muted'
+        }`}
+        title="画笔"
+      >
+        <Pen className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => onSelectTool('eraser')}
+        className={`p-1 rounded text-xs ${
+          tool === 'eraser'
+            ? 'bg-indigo-100 text-indigo-600'
+            : 'text-muted-foreground hover:bg-muted'
+        }`}
+        title="橡皮"
+      >
+        <Eraser className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={onUndo}
+        className="p-1 rounded text-xs text-muted-foreground hover:bg-muted"
+        title="撤销"
+      >
+        <Undo2 className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={onRedo}
+        className="p-1 rounded text-xs text-muted-foreground hover:bg-muted"
+        title="重做"
+      >
+        <Redo2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
 function drawPaths(ctx: CanvasRenderingContext2D, paths: PathData[]) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   paths.forEach((p) => {
@@ -297,47 +352,6 @@ export function WhiteboardBlock({ block, onUpdate, blockId }: Props) {
     error: <span className="text-xs text-red-500">保存失败</span>,
   };
 
-  const ToolBar = () => (
-    <div className="flex items-center gap-0.5">
-      <button
-        onClick={() => setTool('pen')}
-        className={`p-1 rounded text-xs ${
-          tool === 'pen'
-            ? 'bg-indigo-100 text-indigo-600'
-            : 'text-muted-foreground hover:bg-muted'
-        }`}
-        title="画笔"
-      >
-        <Pen className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={() => setTool('eraser')}
-        className={`p-1 rounded text-xs ${
-          tool === 'eraser'
-            ? 'bg-indigo-100 text-indigo-600'
-            : 'text-muted-foreground hover:bg-muted'
-        }`}
-        title="橡皮"
-      >
-        <Eraser className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={handleUndo}
-        className="p-1 rounded text-xs text-muted-foreground hover:bg-muted"
-        title="撤销"
-      >
-        <Undo2 className="w-3.5 h-3.5" />
-      </button>
-      <button
-        onClick={handleRedo}
-        className="p-1 rounded text-xs text-muted-foreground hover:bg-muted"
-        title="重做"
-      >
-        <Redo2 className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-
   const inlineContent = (
     <div className="rounded-lg border border-border overflow-hidden bg-white group">
       <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 border-b border-border">
@@ -345,7 +359,12 @@ export function WhiteboardBlock({ block, onUpdate, blockId }: Props) {
         <span className="text-xs font-medium text-foreground/70 mr-auto">
           白板
         </span>
-        <ToolBar />
+        <WhiteboardToolbar
+          tool={tool}
+          onSelectTool={setTool}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+        />
         {saveStatusIcon[saveStatus]}
         <button
           onClick={() => setExpanded(true)}
@@ -400,7 +419,12 @@ export function WhiteboardBlock({ block, onUpdate, blockId }: Props) {
             <span className="text-xs font-medium text-foreground/70 mr-auto">
               交互式白板
             </span>
-            <ToolBar />
+            <WhiteboardToolbar
+              tool={tool}
+              onSelectTool={setTool}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+            />
             {saveStatusIcon[saveStatus]}
             <button
               onClick={() => setExpanded(false)}

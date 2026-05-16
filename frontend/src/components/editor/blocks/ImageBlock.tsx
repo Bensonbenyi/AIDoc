@@ -74,6 +74,7 @@ export function ImageBlock({ block, onUpdate }: Props) {
   if (displayUrl) {
     return (
       <div className="relative group">
+        {/* eslint-disable-next-line @next/next/no-img-element -- supports local blob: previews from unsaved uploads */}
         <img
           src={displayUrl}
           alt={alt}

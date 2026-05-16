@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useMemo } from 'react';
 import { DocumentBlock } from '@/types/block';
 import { focusBaseTextLineAfterBlock, getEditorText, placeCaretAtEnd } from '@/lib/editor-interactions';
 import { useDocumentStore } from '@/stores/documentStore';
@@ -11,7 +11,10 @@ interface Props {
 }
 
 export function NumberedBlock({ block, onUpdate }: Props) {
-  const items = (block.content.items as string[]) || [];
+  const items = useMemo(
+    () => (block.content.items as string[]) || [],
+    [block.content.items]
+  );
   const removeBlock = useDocumentStore((s) => s.removeBlock);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -20,7 +23,7 @@ export function NumberedBlock({ block, onUpdate }: Props) {
     if (items.length === 0) {
       onUpdate({ items: [''] });
     }
-  }, []);
+  }, [items.length, onUpdate]);
 
   const commitItemText = useCallback(
     (index: number) => {

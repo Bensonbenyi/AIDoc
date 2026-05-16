@@ -16,7 +16,6 @@ import {
   Save,
   Check,
   Loader2,
-  ChevronDown,
   ChevronUp,
   Download,
   Table2,
@@ -35,6 +34,46 @@ interface Props {
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+function getChartDataFromContent(content: Record<string, unknown>): Chart3DData {
+  if (content.x && Array.isArray(content.x)) {
+    // 新格式
+    return {
+      title: (content.title as string) || '3D 图表',
+      source: content.source as string | undefined,
+      chartType: (content.chartType as 'bar' | 'scatter' | 'surface') || 'bar',
+      x: content.x as (string | number)[],
+      y: content.y as (string | number)[],
+      z: content.z as (string | number)[] | null | undefined,
+      xLabel: content.xLabel as string | undefined,
+      yLabel: content.yLabel as string | undefined,
+      zLabel: content.zLabel as string | undefined,
+    };
+  }
+
+  if (content.bars && Array.isArray(content.bars)) {
+    // 旧格式兼容
+    const bars = content.bars as { label: string; height: number }[];
+    return {
+      title: (content.title as string) || '3D 图表',
+      source: content.source as string | undefined,
+      chartType: 'bar',
+      x: bars.map((b) => b.label),
+      y: bars.map((b) => b.height),
+      xLabel: 'X 轴',
+      yLabel: 'Y 轴',
+    };
+  }
+
+  return {
+    title: '3D 图表',
+    chartType: 'bar',
+    x: ['一月', '二月', '三月', '四月', '五月'],
+    y: [10, 25, 15, 30, 20],
+    xLabel: '月份',
+    yLabel: '数值',
+  };
+}
 
 export function Chart3DBlock({ block, onUpdate }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -68,66 +107,33 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
 
   // 从后端加载图表数据
   useEffect(() => {
-    loadChartData();
-  }, [block.id]);
+    let ignore = false;
 
-  const loadChartData = async () => {
-    try {
-      setIsLoading(true);
-      const response = await chartsAPI.getByBlock(block.id);
-      if (response.chartConfig?.data) {
-        setChartData(response.chartConfig.data as Chart3DData);
-      } else {
-        // 使用 block.content 中的数据（兼容旧格式）
-        initFromBlockContent();
-      }
-    } catch {
-      // 如果没有后端数据，使用 block.content
-      initFromBlockContent();
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    chartsAPI
+      .getByBlock(block.id)
+      .then((response) => {
+        if (ignore) return;
+        if (response?.chartConfig?.data) {
+          setChartData(response.chartConfig.data as Chart3DData);
+        } else {
+          setChartData(getChartDataFromContent(block.content));
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setChartData(getChartDataFromContent(block.content));
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setIsLoading(false);
+        }
+      });
 
-  const initFromBlockContent = () => {
-    const content = block.content;
-    if (content.x && Array.isArray(content.x)) {
-      // 新格式
-      setChartData({
-        title: (content.title as string) || '3D 图表',
-        source: content.source as string | undefined,
-        chartType: (content.chartType as 'bar' | 'scatter' | 'surface') || 'bar',
-        x: content.x as (string | number)[],
-        y: content.y as (string | number)[],
-        z: content.z as (string | number)[] | null | undefined,
-        xLabel: content.xLabel as string | undefined,
-        yLabel: content.yLabel as string | undefined,
-        zLabel: content.zLabel as string | undefined,
-      });
-    } else if (content.bars && Array.isArray(content.bars)) {
-      // 旧格式兼容
-      const bars = content.bars as { label: string; height: number }[];
-      setChartData({
-        title: (content.title as string) || '3D 图表',
-        source: content.source as string | undefined,
-        chartType: 'bar',
-        x: bars.map((b) => b.label),
-        y: bars.map((b) => b.height),
-        xLabel: 'X 轴',
-        yLabel: 'Y 轴',
-      });
-    } else {
-      // 默认示例数据
-      setChartData({
-        title: '3D 图表',
-        chartType: 'bar',
-        x: ['一月', '二月', '三月', '四月', '五月'],
-        y: [10, 25, 15, 30, 20],
-        xLabel: '月份',
-        yLabel: '数值',
-      });
-    }
-  };
+    return () => {
+      ignore = true;
+    };
+  }, [block.id, block.content]);
 
   // 保存图表数据到后端
   const saveChartData = useCallback(
@@ -175,9 +181,8 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
     [debouncedSave, onUpdate]
   );
 
-  // 初始化编辑状态
-  useEffect(() => {
-    if (chartData && showEditor) {
+  const openEditor = useCallback(() => {
+    if (chartData) {
       setEditTitle(chartData.title || '');
       setEditX(chartData.x?.join(', ') || '');
       setEditY(chartData.y?.join(', ') || '');
@@ -186,7 +191,8 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
       setEditYLabel(chartData.yLabel || '');
       setEditZLabel(chartData.zLabel || '');
     }
-  }, [chartData, showEditor]);
+    setShowEditor(true);
+  }, [chartData]);
 
   // 输入框键盘事件处理 — 阻止冒泡到 SortableBlock，保护 IME 组合
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -694,7 +700,7 @@ export function Chart3DBlock({ block, onUpdate }: Props) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setShowEditor(!showEditor)}
+            onClick={() => (showEditor ? setShowEditor(false) : openEditor())}
             title="编辑数据"
           >
             <Settings className="h-4 w-4" />
