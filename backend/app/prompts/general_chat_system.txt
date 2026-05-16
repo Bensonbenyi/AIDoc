@@ -24,12 +24,7 @@
 
 ## 输出格式
 
-请以 JSON 格式返回你的回答：
+请直接用普通聊天文本回答用户，不要返回 JSON、代码块或任何结构化对象。
 
-```json
-{
-  "answer": "你的回答（支持 Markdown 格式）",
-  "confidence": "high/medium/low",
-  "reason": "置信度说明"
-}
-```
+- 可以使用 Markdown 列表、加粗等格式增强可读性。
+- 不要输出 `answer`、`confidence`、`reason`、`references` 等字段名。

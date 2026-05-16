@@ -5,6 +5,7 @@ AI Service 层
 """
 
 import json
+import re
 import uuid
 from pathlib import Path
 from typing import AsyncGenerator
@@ -143,9 +144,12 @@ class AIService:
         # 历史消息
         if history:
             for msg in history:
+                content = msg.content
+                if msg.role != "user":
+                    content = self._parse_ai_response(content)["answer"]
                 messages.append({
                     "role": "user" if msg.role == "user" else "assistant",
-                    "content": msg.content,
+                    "content": content,
                 })
 
         # 当前用户消息
@@ -155,9 +159,10 @@ class AIService:
 
     def _parse_ai_response(self, raw_response: str) -> dict:
         """
-        解析 LLM 返回的 JSON 格式响应
+        解析 LLM 响应
 
-        尝试从响应中提取 JSON，如果失败则将整个响应作为 answer
+        新 prompt 要求模型直接返回聊天文本。这里保留旧 JSON 响应兼容，
+        避免历史 prompt 或模型偶发输出结构化内容时把 JSON 暴露给前端。
         """
         # 尝试提取 JSON 块
         json_start = raw_response.find("{")
@@ -172,15 +177,46 @@ class AIService:
                     "references": parsed.get("references", []),
                 }
             except json.JSONDecodeError:
-                pass
+                legacy_answer = self._extract_legacy_answer(raw_response)
+                if legacy_answer:
+                    return {
+                        "answer": legacy_answer,
+                        "confidence": "medium",
+                        "reason": "从旧版结构化响应中提取 answer",
+                        "references": [],
+                    }
 
-        # JSON 解析失败，将整个响应作为 answer
+        # 非 JSON 响应即为正常聊天文本
         return {
             "answer": raw_response,
             "confidence": "medium",
-            "reason": "无法解析结构化响应",
+            "reason": "",
             "references": [],
         }
+
+    def _extract_legacy_answer(self, raw_response: str) -> str | None:
+        """
+        从旧版 JSON-like 响应里提取 answer 字段。
+
+        有些模型会在 references.quote 中输出未转义引号，导致整个 JSON
+        解析失败；answer 本身通常仍是合法 JSON 字符串，可以单独解析。
+        """
+        match = re.search(r'"answer"\s*:', raw_response)
+        if not match:
+            return None
+
+        value_start = match.end()
+        while value_start < len(raw_response) and raw_response[value_start].isspace():
+            value_start += 1
+
+        try:
+            value, _ = json.JSONDecoder().raw_decode(raw_response[value_start:])
+        except json.JSONDecodeError:
+            return None
+
+        if isinstance(value, str):
+            return value
+        return str(value)
 
     async def chat(
         self,

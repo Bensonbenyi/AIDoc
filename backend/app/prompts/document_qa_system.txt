@@ -24,26 +24,11 @@
 
 ## 输出格式
 
-请以 JSON 格式返回你的回答：
+请直接用普通聊天文本回答用户，不要返回 JSON、代码块或任何结构化对象。
 
-```json
-{
-  "answer": "你的详细回答（支持 Markdown 格式）",
-  "confidence": "high/medium/low",
-  "reason": "置信度的原因说明",
-  "references": [
-    {
-      "source_index": 1,
-      "quote": "你引用的原文片段"
-    }
-  ]
-}
-```
-
-- `confidence` 字段说明：
-  - `high`：文档中有明确、完整的信息支持回答
-  - `medium`：文档中有相关信息，但可能不够完整
-  - `low`：文档中信息有限，回答主要基于推理
+- 可以使用 Markdown 列表、加粗等格式增强可读性。
+- 需要引用来源时，直接在相关句子末尾标注 `[来源 X]`。
+- 不要输出 `answer`、`confidence`、`reason`、`references` 等字段名。
 
 ## 文档上下文
 
