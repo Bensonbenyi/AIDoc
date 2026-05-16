@@ -1310,3 +1310,43 @@ npm run dev
 3. **复制按钮**: 点击"复制"应将内容复制到剪贴板
 4. **插入按钮**: 点击"插入"应在当前 block 下方创建新的文本 block
 5. **继续按钮**: 点击"继续"应将回答发送到 AI 侧边栏继续对话
+
+## Bug 修复：后端数据存储慢 + 退格键无法删除内容
+
+**修复时间**: 2026-05-16（两轮修复）
+
+### 问题描述
+1. 后端数据保存反应非常慢
+2. 使用退格键删除 block 后，block 重新出现并报 "API Error 网络请求失败"
+
+### 根因分析
+1. **保存慢**：
+   - `batch_save_blocks` 中对每个 block 执行单独的 `db.get()` 查询（N+1 查询问题）
+   - 每次自动保存都触发 RAG 重新索引（包含外部 embedding API 调用）
+   - `blocks.py` 中 `_trigger_rag_reindex` 使用了不存在的 `async_session_factory`（应为 `async_session_maker`），可能导致启动失败
+2. **退格键失效**：
+   - 退格键删除 block 后，RAG 后台任务导致 DELETE 请求超时/失败
+   - 前端 `removeBlock` 捕获错误后回滚状态，block 重新出现
+   - TextBlock 组件卸载时 `onBlur` → `commitText` 调用 `updateBlock` 更新已删除的 block
+
+### 修改的文件
+
+**后端**:
+- `backend/app/main.py` — 注释掉 RAG 路由注册
+- `backend/app/routers/documents.py` — 注释掉 `_trigger_rag_reindex`，移除所有 `BackgroundTasks`，移除手动 `db.commit()`（由 `get_db` 统一处理事务）
+- `backend/app/routers/blocks.py` — 注释掉 `_trigger_rag_reindex`，移除所有 `BackgroundTasks`，简化 `delete_block` 端点
+- `backend/app/services/block_service.py` — 将 N+1 查询改为批量查询
+
+**前端**:
+- `frontend/src/stores/documentStore.ts` — `updateBlock` 添加 block 存在性检查
+
+### 如何测试
+1. 启动后端和前端服务
+2. 在编辑器中输入内容，保存应快速响应
+3. 使用退格键删除 block，block 应正常删除且不会重新出现
+4. 运行后端测试：`cd backend && uv run pytest tests/ -v`（18 个测试应全部通过）
+
+### 注意事项
+- RAG 相关代码已注释但保留，未来需要时取消注释即可
+- `rag.py` 路由文件仍存在但未注册，不影响运行
+- RAG 服务文件（`rag_service.py`、`embedding_service.py` 等）未修改，保持原样

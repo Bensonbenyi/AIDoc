@@ -66,15 +66,17 @@ async def batch_save_blocks(
         if b.id is not None:
             preserved_ids.add(b.id)
 
-    # 查找该文档下所有现有 block ID
-    old_block_ids_stmt = select(DocumentBlock.id).where(
+    # 一次性查询该文档下所有现有 block（避免 N+1 查询）
+    old_blocks_stmt = select(DocumentBlock).where(
         DocumentBlock.document_id == document_id
     )
-    old_block_ids_result = await db.execute(old_block_ids_stmt)
-    old_block_ids = [row[0] for row in old_block_ids_result.all()]
+    old_blocks_result = await db.execute(old_blocks_stmt)
+    old_blocks_map: dict[uuid.UUID, DocumentBlock] = {
+        b.id: b for b in old_blocks_result.scalars().all()
+    }
 
     # 找出需要删除的 block（不在保留列表中的）
-    ids_to_delete = [bid for bid in old_block_ids if bid not in preserved_ids]
+    ids_to_delete = [bid for bid in old_blocks_map if bid not in preserved_ids]
 
     if ids_to_delete:
         # 删除要丢弃的 block 的关联数据
@@ -97,16 +99,14 @@ async def batch_save_blocks(
             else block_data.block_type
         )
 
-        if block_data.id is not None and block_data.id in preserved_ids:
-            # 检查 block 是否已存在于数据库
-            existing = await db.get(DocumentBlock, block_data.id)
-            if existing:
-                # 更新已有 block
-                existing.block_type = block_type
-                existing.content = block_data.content
-                existing.properties = block_data.properties
-                existing.sort_order = block_data.sort_order
-                continue
+        if block_data.id is not None and block_data.id in old_blocks_map:
+            # 更新已有 block（直接从 map 获取，无需额外查询）
+            existing = old_blocks_map[block_data.id]
+            existing.block_type = block_type
+            existing.content = block_data.content
+            existing.properties = block_data.properties
+            existing.sort_order = block_data.sort_order
+            continue
 
         # 创建新 block
         block = DocumentBlock(

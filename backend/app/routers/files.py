@@ -48,6 +48,7 @@ async def upload_file(
             document_id=doc_uuid,
             block_id=block_uuid,
         )
+        await db.commit()
         return file_asset
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -105,6 +106,7 @@ async def delete_file(
 
     try:
         await file_service.delete_file(db, file_uuid)
+        await db.commit()
         return {"success": True}
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="文件不存在")

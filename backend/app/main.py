@@ -112,13 +112,14 @@ async def root():
 
 
 # 注册路由
-from app.routers import documents, blocks, code_execution, charts, ai, rag, files, system  # noqa: E402
+from app.routers import documents, blocks, code_execution, charts, ai, files, system  # noqa: E402
+# [RAG 暂时禁用] from app.routers import rag
 
 app.include_router(documents.router, prefix="/api/documents", tags=["文档管理"])
 app.include_router(blocks.router, prefix="/api/blocks", tags=["Block 管理"])
 app.include_router(code_execution.router, prefix="/api/code-executions", tags=["代码执行"])
 app.include_router(charts.router, prefix="/api/charts", tags=["3D 图表"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI 对话"])
-app.include_router(rag.router, prefix="/api/rag", tags=["RAG 检索"])
+# [RAG 暂时禁用] app.include_router(rag.router, prefix="/api/rag", tags=["RAG 检索"])
 app.include_router(files.router, prefix="/api/files", tags=["文件管理"])
 app.include_router(system.router, prefix="/api/system", tags=["系统管理"])

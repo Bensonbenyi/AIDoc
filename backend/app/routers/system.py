@@ -144,6 +144,8 @@ async def init_system(db: AsyncSession = Depends(get_db)):
             metadata={"documents_created": docs_created},
         )
 
+        await db.commit()
+
         return SystemInitResponse(
             success=True,
             message="系统初始化成功",

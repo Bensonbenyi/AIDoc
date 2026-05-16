@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { DocumentTreeNode } from '@/types/document';
 import { DocumentBlock } from '@/types/block';
 import {
-  ApiError,
   documentsAPI,
   blocksAPI,
   type BlockCreate,
@@ -32,7 +31,7 @@ interface DocumentState {
   updateBlock: (blockId: string, content: Record<string, unknown>) => void;
   toggleTodoItem: (blockId: string, itemIndex: number) => void;
   insertBlock: (afterBlockId: string, blockType: string) => Promise<void>;
-  removeBlock: (blockId: string) => Promise<void>;
+  removeBlock: (blockId: string) => void;
   undoLastChange: (docId?: string | null) => void;
   duplicateBlock: (blockId: string) => Promise<void>;
   moveBlock: (blockId: string, targetIndex: number) => void;
@@ -97,9 +96,9 @@ function defaultBlockContent(blockType: string): Record<string, unknown> {
     case 'video':
       return {};
     case 'image':
-      return { text: '图片占位块' };
+      return {};
     case 'file':
-      return { text: '文件附件占位块' };
+      return {};
     default:
       return {};
   }
@@ -228,6 +227,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
 
   updateBlock: (blockId, content) => {
+    // 如果 block 已被移除（如退格键删除），跳过更新
+    const blockExists = get().blocks.some((b) => b.id === blockId);
+    if (!blockExists) return;
+
     // 乐观更新本地状态
     set((s) => ({
       blocks: s.blocks.map((b) => (b.id === blockId ? { ...b, content, updatedAt: now() } : b)),
@@ -289,9 +292,9 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
     }
   },
 
-  removeBlock: async (blockId) => {
+  removeBlock: (blockId) => {
     const { blocks, currentDocId } = get();
-    // 乐观更新
+    // 乐观更新：直接从本地状态移除
     const newBlocks = blocks.filter((b) => b.id !== blockId);
     set((s) => ({
       blocks: newBlocks,
@@ -303,21 +306,8 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           }
         : s.historyByDocId,
     }));
-    try {
-      await blocksAPI.delete(blockId);
-    } catch (error: unknown) {
-      // 404 表示 block 在后端已不存在，视为删除成功，不回滚
-      if (error instanceof ApiError && error.status === 404) {
-        console.warn('Block 在后端已不存在，跳过删除:', blockId);
-        return;
-      }
-      console.error('删除 block 失败:', error);
-      // 回滚
-      set((s) => ({
-        blocks,
-        documentsById: currentDocId ? { ...s.documentsById, [currentDocId]: blocks } : s.documentsById,
-      }));
-    }
+    // 删除操作通过 batch_save 统一持久化，不单独调用 delete API
+    scheduleAutoSave(get);
   },
 
   undoLastChange: (docId) => {

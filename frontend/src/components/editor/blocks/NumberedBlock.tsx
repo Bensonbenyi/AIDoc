@@ -10,7 +10,7 @@ interface Props {
   onUpdate: (content: Record<string, unknown>) => void;
 }
 
-export function BulletBlock({ block, onUpdate }: Props) {
+export function NumberedBlock({ block, onUpdate }: Props) {
   const items = (block.content.items as string[]) || [];
   const removeBlock = useDocumentStore((s) => s.removeBlock);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -51,6 +51,7 @@ export function BulletBlock({ block, onUpdate }: Props) {
         // 从 DOM 读取所有项的最新内容
         const currentItems = itemRefs.current.map((el, i) => {
           if (i === index) {
+            // 当前项从事件目标读取
             return getEditorText(e.currentTarget);
           }
           return el ? getEditorText(el) : (items[i] || '');
@@ -61,6 +62,7 @@ export function BulletBlock({ block, onUpdate }: Props) {
         newItems.splice(index + 1, 0, '');
         onUpdate({ items: newItems });
 
+        // 聚焦到新项
         window.requestAnimationFrame(() => {
           const newRef = itemRefs.current[index + 1];
           if (newRef) {
@@ -79,14 +81,17 @@ export function BulletBlock({ block, onUpdate }: Props) {
         if (isEmpty) {
           e.preventDefault();
 
+          // 如果只有一项，删除整个 block
           if (items.length <= 1) {
             removeBlock(block.id);
             return;
           }
 
+          // 删除当前项
           const newItems = items.filter((_, i) => i !== index);
           onUpdate({ items: newItems });
 
+          // 聚焦到前一项
           window.requestAnimationFrame(() => {
             const prevIndex = Math.max(0, index - 1);
             const prevRef = itemRefs.current[prevIndex];
@@ -129,8 +134,8 @@ export function BulletBlock({ block, onUpdate }: Props) {
     <div className="space-y-1 text-[15px] text-foreground/90">
       {items.map((item, i) => (
         <div key={i} className="flex items-start gap-2">
-          <span className="shrink-0 w-4 text-center text-muted-foreground select-none mt-0.5">
-            •
+          <span className="shrink-0 w-6 text-right text-muted-foreground select-none mt-0.5">
+            {i + 1}.
           </span>
           <div
             ref={(el) => { itemRefs.current[i] = el; }}

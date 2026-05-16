@@ -7,6 +7,7 @@ import {
   TextBlock,
   QuoteBlock,
   BulletBlock,
+  NumberedBlock,
   TodoBlock,
   TableBlock,
   DividerBlock,
@@ -14,6 +15,8 @@ import {
   DocLinkBlock,
   WhiteboardBlock,
   Chart3DBlock,
+  ImageBlock,
+  FileBlock,
   AIAnswerBlock,
   AudioBlock,
   VideoBlock,
@@ -42,8 +45,9 @@ export function BlockRenderer({ block }: Props) {
     case 'quote':
       return <QuoteBlock block={block} onUpdate={handleUpdate} />;
     case 'bullet':
-    case 'numbered':
       return <BulletBlock block={block} onUpdate={handleUpdate} />;
+    case 'numbered':
+      return <NumberedBlock block={block} onUpdate={handleUpdate} />;
     case 'todo':
       return <TodoBlock block={block} onUpdate={handleUpdate} />;
     case 'table':
@@ -64,6 +68,10 @@ export function BlockRenderer({ block }: Props) {
       return <AudioBlock block={block} onUpdate={handleUpdate} />;
     case 'video':
       return <VideoBlock block={block} onUpdate={handleUpdate} />;
+    case 'image':
+      return <ImageBlock block={block} onUpdate={handleUpdate} />;
+    case 'file':
+      return <FileBlock block={block} onUpdate={handleUpdate} />;
     default:
       return <TextBlock block={block} onUpdate={handleUpdate} />;
   }

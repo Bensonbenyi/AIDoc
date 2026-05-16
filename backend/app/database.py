@@ -44,7 +44,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         try:
             yield session
             await session.commit()
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.error(f"数据库会话提交失败，正在回滚: {e}")
             await session.rollback()
             raise
         finally:

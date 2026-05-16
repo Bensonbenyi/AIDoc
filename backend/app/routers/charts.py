@@ -47,6 +47,7 @@ async def create_chart(
             source_block_id=data.source_block_id,
             data_json=data.data_json,
         )
+        await db.commit()
         return Chart3DResponse(
             chart_id=chart.id,
             chart_config=chart.chart_config,
@@ -95,6 +96,7 @@ async def update_chart(
             source_type=data.source_type.value if data.source_type else None,
             source_block_id=data.source_block_id,
         )
+        await db.commit()
         return Chart3DResponse(
             chart_id=chart.id,
             chart_config=chart.chart_config,
@@ -145,6 +147,7 @@ async def save_chart_by_block(
             source_type=data.source_type.value,
             source_block_id=data.source_block_id,
         )
+        await db.commit()
         return Chart3DResponse(
             chart_id=chart.id,
             chart_config=chart.chart_config,

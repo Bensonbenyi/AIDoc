@@ -55,6 +55,7 @@ async def execute_code(
         stderr=result["stderr"],
         execution_time_ms=result["execution_time_ms"],
     )
+    await db.commit()
     return execution
 
 
@@ -75,6 +76,7 @@ async def save_code_execution(
         stderr=data.stderr,
         execution_time_ms=data.execution_time_ms,
     )
+    await db.commit()
     return execution
 
 

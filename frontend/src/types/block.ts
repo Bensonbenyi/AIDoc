@@ -98,6 +98,20 @@ export interface VideoContent {
   posterUrl?: string;
 }
 
+export interface ImageContent {
+  fileId?: string;
+  fileName?: string;
+  fileUrl?: string;
+  alt?: string;
+}
+
+export interface FileContent {
+  fileId?: string;
+  fileName?: string;
+  fileUrl?: string;
+  fileSize?: number;
+}
+
 export interface SlashMenuItem {
   id: BlockType;
   icon: string;

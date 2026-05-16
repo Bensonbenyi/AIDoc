@@ -45,6 +45,7 @@ async def create_session(
     - **title**: 会话标题
     """
     session = await ai_service.create_session(db, document_id, title)
+    await db.commit()
     return {
         "id": session.id,
         "document_id": session.document_id,
@@ -151,6 +152,7 @@ async def chat(
 
     # 调用 AI 服务
     result = await ai_service.chat(db, session_id, request.message)
+    await db.commit()
 
     # 构造引用列表
     references = []
@@ -392,6 +394,7 @@ async def document_qa(
 
     # 调用 AI 服务（带历史消息上下文）
     result = await ai_service.chat(db, session_id, request.question, context=context)
+    await db.commit()
 
     # 构造引用列表
     references = []
