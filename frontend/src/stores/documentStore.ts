@@ -111,7 +111,6 @@ function toDocumentBlock(b: BlockResponse): DocumentBlock {
   return {
     id: b.id,
     documentId: b.documentId,
-    parentBlockId: b.parentBlockId || undefined,
     blockType: b.blockType as DocumentBlock['blockType'],
     content: b.content,
     properties: b.properties || undefined,

@@ -270,7 +270,6 @@ export interface BlockUpdate {
 export interface BlockResponse {
   id: string;
   documentId: string;
-  parentBlockId: string | null;
   blockType: string;
   content: Record<string, unknown>;
   properties: Record<string, unknown> | null;

@@ -42,12 +42,6 @@ class Settings(BaseSettings):
         description="使用的 LLM 模型名"
     )
 
-    # Redis 配置（可选）
-    REDIS_URL: Optional[str] = Field(
-        default=None,
-        description="Redis 地址（可选）"
-    )
-
     # 文件存储配置
     FILE_STORAGE_TYPE: str = Field(
         default="local",

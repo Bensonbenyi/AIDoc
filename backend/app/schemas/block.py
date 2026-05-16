@@ -45,7 +45,6 @@ class BlockResponse(BaseModel):
 
     id: uuid.UUID
     document_id: uuid.UUID
-    parent_block_id: uuid.UUID | None
     block_type: str
     content: dict
     properties: dict | None

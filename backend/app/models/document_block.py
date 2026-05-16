@@ -17,9 +17,6 @@ class DocumentBlock(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
     )
-    parent_block_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("document_blocks.id"), nullable=True
-    )
     block_type: Mapped[str] = mapped_column(
         String(50),
         nullable=False,

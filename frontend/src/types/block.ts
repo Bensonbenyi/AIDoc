@@ -22,7 +22,6 @@ export type BlockType =
 export interface DocumentBlock {
   id: string;
   documentId: string;
-  parentBlockId?: string;
   blockType: BlockType;
   content: Record<string, unknown>;
   properties?: Record<string, unknown>;
