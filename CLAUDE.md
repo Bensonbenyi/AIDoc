@@ -2,14 +2,6 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## 1. 开发总原则
-- 先阅读 memory-bank/progress.md 文件了解当前进度
-- 阅读 docs/plan.md，实现下一未完成的阶段
-- 一次只完成一个阶段
-- 完成一个阶段后，记录进度到 memory-bank/progress.md
-- 每个阶段完成后必须可以运行
-- 每个阶段完成后必须说明修改了哪些文件
-- 每个阶段完成后必须说明如何人为测试
 
 ## Project Overview
 
