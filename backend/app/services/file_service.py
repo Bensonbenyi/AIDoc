@@ -211,10 +211,13 @@ async def _save_to_local(content: bytes, filename: str) -> str:
 def _get_s3_client():
     """获取 S3 客户端"""
     import boto3
+    from botocore.config import Config
+
     kwargs = {
         "aws_access_key_id": settings.S3_ACCESS_KEY,
         "aws_secret_access_key": settings.S3_SECRET_KEY,
         "region_name": settings.S3_REGION,
+        "config": Config(s3={"addressing_style": "path"}),
     }
     if settings.S3_ENDPOINT:
         kwargs["endpoint_url"] = settings.S3_ENDPOINT

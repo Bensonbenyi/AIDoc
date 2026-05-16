@@ -20,5 +20,5 @@ RUN mkdir -p logs storage
 # 暴露端口
 EXPOSE 8000
 
-# 启动 FastAPI 应用
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 启动 FastAPI 应用（Render 会注入 PORT）
+CMD ["sh", "-c", "uv run uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

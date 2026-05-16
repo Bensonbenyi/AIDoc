@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from loguru import logger
 import sys
+from urllib.parse import urlsplit, urlunsplit
 
 from app.config import settings
 from app.database import init_db
@@ -37,6 +38,22 @@ if settings.LOG_TO_FILE:
     )
 
 
+def _redact_url_password(url: str) -> str:
+    """Mask credentials before writing service URLs to logs."""
+    try:
+        parsed = urlsplit(url)
+        if parsed.password is None:
+            return url
+
+        username = parsed.username or ""
+        hostname = parsed.hostname or ""
+        port = f":{parsed.port}" if parsed.port else ""
+        netloc = f"{username}:***@{hostname}{port}"
+        return urlunsplit((parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment))
+    except Exception:
+        return "<redacted>"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -46,7 +63,7 @@ async def lifespan(app: FastAPI):
     """
     # 启动时执行
     logger.info("正在启动 AIDoc 后端服务...")
-    logger.info(f"数据库地址: {settings.DATABASE_URL}")
+    logger.info(f"数据库地址: {_redact_url_password(settings.DATABASE_URL)}")
     logger.info(f"前端地址: {settings.FRONTEND_URL}")
     logger.info(f"LLM 模型: {settings.LLM_MODEL}")
     logger.info(f"文件存储类型: {settings.FILE_STORAGE_TYPE}")
