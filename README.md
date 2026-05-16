@@ -123,10 +123,18 @@ LLM_MODEL=glm-5.1
 FILE_STORAGE_TYPE=local
 LOCAL_STORAGE_PATH=./storage
 
-# 代码执行配置
+# 代码执行配置（Docker 模式）
 CODE_EXECUTION_MODE=docker
 CODE_EXECUTION_TIMEOUT=30
+DOCKER_IMAGE=aidoc-python-runner
+DOCKER_MEMORY_LIMIT=256m
+DOCKER_CPU_LIMIT=0.5
+
+# 日志等级
+LOG_LEVEL=INFO
 ```
+
+> **注意**: `backend/.env.example` 中 `CODE_EXECUTION_MODE` 默认为 `pyodide`（旧值），实际项目使用 `docker` 模式。请以 `config.py` 默认值为准。
 
 #### 初始化数据库
 
@@ -290,6 +298,7 @@ uv run python scripts/init_db.py           # 初始化数据库
 |--------|------|--------|
 | `DATABASE_URL` | PostgreSQL 连接地址 | `postgresql+asyncpg://postgres:postgres@localhost:5432/aidoc` |
 | `FRONTEND_URL` | 前端地址（CORS） | `http://localhost:3000` |
+| `BACKEND_URL` | 后端地址 | `http://localhost:8000` |
 | `LLM_API_KEY` | 智谱 AI API Key | - |
 | `LLM_BASE_URL` | LLM 服务地址 | `https://open.bigmodel.cn/api/paas/v4` |
 | `LLM_MODEL` | LLM 模型名 | `glm-5.1` |
@@ -297,6 +306,9 @@ uv run python scripts/init_db.py           # 初始化数据库
 | `LOCAL_STORAGE_PATH` | 本地存储路径 | `./storage` |
 | `CODE_EXECUTION_MODE` | 代码执行模式 | `docker` |
 | `CODE_EXECUTION_TIMEOUT` | 代码执行超时（秒） | `30` |
+| `DOCKER_IMAGE` | Docker 执行镜像 | `aidoc-python-runner` |
+| `DOCKER_MEMORY_LIMIT` | Docker 内存限制 | `256m` |
+| `DOCKER_CPU_LIMIT` | Docker CPU 限制 | `0.5` |
 | `LOG_LEVEL` | 日志等级 | `INFO` |
 
 ## 常见问题

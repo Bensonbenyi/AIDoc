@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 AIDoc is an AI-native interactive document system — a Notion/AFFiNE-like block editor with integrated AI chat, Python code execution, 3D charts, and whiteboard.
 
-**Current status**: 阶段 0-11 已完成。前端和后端均已实现并对接。前端使用真实 API 调用（非 mock 数据）。
+**Current status**: 阶段 0-11 已完成。前端和后端均已实现并对接。前端使用真实 API 调用（非 mock 数据）。后端有 19 个测试（文档、Block、AI 解析器），使用 SQLite 内存数据库。
 
 **Important**: This project uses Next.js 16, which has breaking changes from earlier versions. Before writing frontend code, check `frontend/node_modules/next/dist/docs/` for current APIs and conventions.
 
@@ -87,6 +87,10 @@ Three stores in `src/stores/`:
 - **批量保存**: `saveDocument()` 将当前文档所有 blocks 通过 `PUT /api/documents/{id}/blocks` 一次性发送
 - **Block 删除**: `removeBlock` 只做本地状态更新 + 触发自动保存，不单独调用 delete API（batch_save 会自动删除后端多余的 blocks）
 - **Block 创建**: `insertBlock`/`addBlockFromSlash` 直接调用后端 API 创建，获取服务端 ID
+
+### 后端事务模式
+- `get_db()` 依赖在请求成功时**自动 commit**，异常时 rollback。路由/服务层无需手动调用 `db.commit()`。
+- 部分遗留路由（ai、charts、files、code_execution）仍有显式 `db.commit()` 调用，属于重复提交但不影响正确性。
 
 ### Backend Architecture (FastAPI)
 
@@ -182,12 +186,22 @@ backend/app/
 ### Backend (`backend/.env`)
 ```
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/aidoc
-LLM_API_KEY=your_zhipu_api_key
-LLM_MODEL=glm-5.1
 FRONTEND_URL=http://localhost:3000
-CODE_EXECUTION_MODE=docker
+BACKEND_URL=http://localhost:8000
+LLM_API_KEY=your_zhipu_api_key
+LLM_BASE_URL=https://open.bigmodel.cn/api/paas/v4
+LLM_MODEL=glm-5.1
 FILE_STORAGE_TYPE=local
+LOCAL_STORAGE_PATH=./storage
+CODE_EXECUTION_MODE=docker
+CODE_EXECUTION_TIMEOUT=30
+DOCKER_IMAGE=aidoc-python-runner
+DOCKER_MEMORY_LIMIT=256m
+DOCKER_CPU_LIMIT=0.5
+LOG_LEVEL=INFO
 ```
+
+> **Note**: `backend/.env.example` 中 `CODE_EXECUTION_MODE` 默认为 `pyodide`，与实际使用的 `docker` 模式不一致。以 `config.py` 默认值和本文档为准。
 
 ### Frontend (`frontend/.env.local`)
 ```
