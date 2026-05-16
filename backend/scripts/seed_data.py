@@ -62,27 +62,13 @@ async def seed_all():
 async def create_document_tree(session: AsyncSession) -> dict:
     """创建文档树结构"""
 
-    # 文档结构定义
+    # 文档结构定义（精简版，3 个文档）
     doc_structure = {
-        "项目总览": {
+        "AIDoc 使用指南": {
             "icon": "📋",
             "children": {
-                "产品设计": {
-                    "icon": "🎨",
-                    "children": {
-                        "用户需求": {"icon": "👥"},
-                        "功能模块": {"icon": "🧩"},
-                        "Demo 剧本": {"icon": "📝"},
-                    }
-                },
-                "技术实现": {
-                    "icon": "⚙️",
-                    "children": {
-                        "前端架构": {"icon": "🖥️"},
-                        "后端架构": {"icon": "🔧"},
-                        "AI 逻辑": {"icon": "🤖"},
-                    }
-                }
+                "功能演示": {"icon": "🎯"},
+                "数据分析示例": {"icon": "📊"},
             }
         }
     }
@@ -126,207 +112,424 @@ async def create_document_tree(session: AsyncSession) -> dict:
 async def create_blocks(session: AsyncSession, documents: dict):
     """创建 block 数据"""
 
-    # 为"项目总览"文档创建 blocks
-    project_doc = documents.get("项目总览")
-    if project_doc:
+    # 为"AIDoc 使用指南"文档创建 blocks（展示所有 Block 类型）
+    guide_doc = documents.get("AIDoc 使用指南")
+    if guide_doc:
         blocks = [
+            # [h1] AIDoc 使用指南
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
+                document_id=guide_doc.id,
                 block_type="heading_1",
-                content={"text": "AI 原生交互式文档系统"},
+                content={"text": "AIDoc 使用指南"},
                 sort_order=1,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [text] 欢迎文字
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
+                document_id=guide_doc.id,
                 block_type="paragraph",
-                content={"text": "这是一款创新的文档系统，将写作、代码执行、数据可视化和 AI 问答融为一体。"},
+                content={"text": "欢迎使用 AIDoc，一款 AI 原生交互式文档系统。在这里，你可以在同一份文档中完成写作、代码执行、数据可视化和 AI 对话。本文档将展示系统支持的所有内容类型。"},
                 sort_order=2,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [divider]
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
-                block_type="heading_2",
-                content={"text": "核心功能"},
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
                 sort_order=3,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [h2] 基础内容
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
-                block_type="bullet_list",
-                content={"items": ["块状文档编辑器", "交互式白板块", "Python 可执行代码块", "3D 图表块", "AI 对话侧边栏"]},
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "基础内容"},
                 sort_order=4,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [text] 基础内容介绍
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
-                block_type="heading_2",
-                content={"text": "技术栈"},
+                document_id=guide_doc.id,
+                block_type="paragraph",
+                content={"text": "AIDoc 支持丰富的基础文本格式，包括多级标题、段落、列表、引用等。"},
                 sort_order=5,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [h3] 待办事项
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=project_doc.id,
-                block_type="table",
-                content={
-                    "headers": ["模块", "技术", "说明"],
-                    "rows": [
-                        ["前端", "Next.js + React", "用户界面框架"],
-                        ["后端", "FastAPI + Python", "API 服务"],
-                        ["数据库", "PostgreSQL", "文档和业务数据存储"],
-                        ["AI", "智谱 AI GLM-5.1", "大语言模型"],
-                    ]
-                },
+                document_id=guide_doc.id,
+                block_type="heading_3",
+                content={"text": "待办事项"},
                 sort_order=6,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
-        ]
-
-        for block in blocks:
-            session.add(block)
-
-    # 为"用户需求"文档创建 blocks
-    user_needs_doc = documents.get("用户需求")
-    if user_needs_doc:
-        blocks = [
+            # [todo] 待办清单
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=user_needs_doc.id,
-                block_type="heading_1",
-                content={"text": "用户需求分析"},
-                sort_order=1,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=user_needs_doc.id,
-                block_type="heading_2",
-                content={"text": "目标用户"},
-                sort_order=2,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=user_needs_doc.id,
-                block_type="paragraph",
-                content={"text": "主要面向需要编写技术文档、数据分析报告和产品设计文档的知识工作者。"},
-                sort_order=3,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=user_needs_doc.id,
+                document_id=guide_doc.id,
                 block_type="todo",
-                content={"text": "完成用户调研", "checked": True},
-                sort_order=4,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=user_needs_doc.id,
-                block_type="todo",
-                content={"text": "整理需求文档", "checked": False},
-                sort_order=5,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-        ]
-
-        for block in blocks:
-            session.add(block)
-
-    # 为"前端架构"文档创建 blocks
-    frontend_doc = documents.get("前端架构")
-    if frontend_doc:
-        blocks = [
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=frontend_doc.id,
-                block_type="heading_1",
-                content={"text": "前端架构设计"},
-                sort_order=1,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=frontend_doc.id,
-                block_type="paragraph",
-                content={"text": "前端采用 Next.js 14 App Router，使用 React Server Components 和 Client Components 混合架构。"},
-                sort_order=2,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-            ),
-            DocumentBlock(
-                id=str(uuid4()),
-                document_id=frontend_doc.id,
-                block_type="code",
                 content={
-                    "language": "typescript",
-                    "code": "// 示例：文档编辑器组件\nexport function DocumentEditor({ docId }: { docId: string }) {\n  const { blocks, loading } = useDocument(docId);\n  \n  if (loading) return <Loading />;\n  \n  return (\n    <div className=\"editor\">\n      {blocks.map(block => (\n        <BlockRenderer key={block.id} block={block} />\n      ))}\n    </div>\n  );\n}"
+                    "items": [
+                        {"text": "了解 AIDoc 的基本功能", "done": True},
+                        {"text": "尝试使用斜杠命令插入新 Block", "done": False},
+                        {"text": "运行一段 Python 代码", "done": False},
+                        {"text": "在白板上画一幅画", "done": False},
+                        {"text": "向 AI 助手提一个问题", "done": False},
+                    ]
                 },
-                sort_order=3,
+                sort_order=7,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
-        ]
-
-        for block in blocks:
-            session.add(block)
-
-    # 为"后端架构"文档创建 blocks
-    backend_doc = documents.get("后端架构")
-    if backend_doc:
-        blocks = [
+            # [h3] 表格
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=backend_doc.id,
-                block_type="heading_1",
-                content={"text": "后端架构设计"},
-                sort_order=1,
+                document_id=guide_doc.id,
+                block_type="heading_3",
+                content={"text": "表格"},
+                sort_order=8,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [table] Block 类型一览
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=backend_doc.id,
+                document_id=guide_doc.id,
+                block_type="table",
+                content={
+                    "headers": ["类型", "图标", "说明", "交互方式"],
+                    "rows": [
+                        ["文本", "¶", "普通段落", "直接编辑"],
+                        ["标题", "H", "三级标题", "直接编辑"],
+                        ["待办", "☐", "待办清单", "勾选切换"],
+                        ["表格", "▦", "数据表格", "单元格编辑"],
+                        ["代码", "🐍", "Python 代码", "代码编辑器 + 运行"],
+                        ["白板", "🎨", "手绘画布", "鼠标绘制"],
+                        ["3D 图表", "📊", "数据可视化", "拖拽旋转"],
+                        ["音频", "🎵", "音频播放", "播放控制"],
+                        ["视频", "🎬", "视频播放", "播放控制"],
+                    ]
+                },
+                sort_order=9,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h3] 引用
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_3",
+                content={"text": "引用"},
+                sort_order=10,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [quote] 设计理念引用
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="quote",
+                content={"text": "\"最好的文档工具，是让你忘记工具本身的存在，专注于内容创作。\" — AIDoc 设计理念"},
+                sort_order=11,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [divider]
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
+                sort_order=12,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h2] 代码执行
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "代码执行"},
+                sort_order=13,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [text] 代码执行介绍
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
                 block_type="paragraph",
-                content={"text": "后端采用 FastAPI 框架，使用 SQLAlchemy 2.0 异步 ORM，PostgreSQL 作为主数据库。"},
-                sort_order=2,
+                content={"text": "AIDoc 内置 Python 代码执行环境。点击运行按钮，代码将在 Docker 沙箱中执行，结果直接显示在文档中。"},
+                sort_order=14,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
+            # [code] Python 代码示例
             DocumentBlock(
                 id=str(uuid4()),
-                document_id=backend_doc.id,
+                document_id=guide_doc.id,
                 block_type="code",
                 content={
                     "language": "python",
-                    "code": "# 示例：文档 API 路由\nfrom fastapi import APIRouter, Depends\nfrom sqlalchemy.ext.asyncio import AsyncSession\n\nrouter = APIRouter()\n\n@router.post(\"/documents\")\nasync def create_document(\n    data: DocumentCreate,\n    db: AsyncSession = Depends(get_db)\n):\n    doc = await document_service.create_document(db, data)\n    return doc"
+                    "code": "import numpy as np\n\n# 生成一组随机数据\nnp.random.seed(42)\ntemperatures = np.random.normal(loc=25, scale=5, size=7)\ndays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']\n\nprint(\"🌡️ 本周每日气温（℃）\")\nprint(\"-\" * 30)\nfor day, temp in zip(days, temperatures):\n    bar = \"█\" * int(temp)\n    print(f\"{day}: {temp:.1f}℃ {bar}\")\n\nprint(f\"\\n平均气温: {temperatures.mean():.1f}℃\")\nprint(f\"最高气温: {temperatures.max():.1f}℃\")\nprint(f\"最低气温: {temperatures.min():.1f}℃\")"
                 },
-                sort_order=3,
+                sort_order=15,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [divider]
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
+                sort_order=16,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h2] 3D 图表
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "3D 图表"},
+                sort_order=17,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [text] 3D 图表介绍
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="paragraph",
+                content={"text": "表格数据和代码输出可以直接生成交互式 3D 图表。鼠标拖拽可以旋转视角，滚轮可以缩放。"},
+                sort_order=18,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [chart3d] 示例图表
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="chart_3d",
+                content={
+                    "title": "季度销售数据 3D 柱状图",
+                    "chartType": "bar",
+                    "x": ["产品A", "产品B", "产品C"],
+                    "y": ["Q1", "Q2", "Q3", "Q4"],
+                    "z": [120, 95, 180, 150, 110, 200, 160, 175, 130, 220, 190, 145],
+                    "xLabel": "产品",
+                    "yLabel": "季度",
+                    "zLabel": "销售额（万元）"
+                },
+                sort_order=19,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [divider]
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
+                sort_order=20,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h2] 交互式白板
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "交互式白板"},
+                sort_order=21,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [text] 白板功能介绍
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="paragraph",
+                content={"text": "白板功能允许你在文档中直接绘制草图、流程图和手写笔记。支持画笔、橡皮、撤销/重做等操作。拖动底部手柄可以调整高度。"},
+                sort_order=22,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [whiteboard] 空白画布
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="whiteboard",
+                content={"paths": []},
+                sort_order=23,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [divider]
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
+                sort_order=24,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h2] 多媒体支持
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "多媒体支持"},
+                sort_order=25,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [text] 多媒体介绍
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="paragraph",
+                content={"text": "AIDoc 支持在文档中嵌入音频和视频文件，提供内联播放器，支持播放/暂停、进度拖拽、音量控制等功能。"},
+                sort_order=26,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [audio] 示例音频（待上传）
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="audio",
+                content={},
+                sort_order=27,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [video] 示例视频（待上传）
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="video",
+                content={},
+                sort_order=28,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [divider]
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="divider",
+                content={},
+                sort_order=29,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [h2] AI 助手
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="heading_2",
+                content={"text": "AI 助手"},
+                sort_order=30,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [text] AI 助手介绍
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="paragraph",
+                content={"text": "右侧 AI 助手面板是 AIDoc 的核心功能之一。你可以：\n1. 直接输入问题进行对话\n2. 将 Block 拖拽到聊天框作为上下文\n3. 点击 Block 工具栏的\"问 AI\"按钮，自动构造问题\n4. AI 回答中包含引用来源，点击可跳转到对应 Block"},
+                sort_order=31,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
+            ),
+            # [ai-answer] 示例 AI 回答
+            DocumentBlock(
+                id=str(uuid4()),
+                document_id=guide_doc.id,
+                block_type="ai_answer",
+                content={"text": "根据文档内容，AIDoc 支持 9 种 Block 类型，涵盖基础文本、代码执行、数据可视化和多媒体。核心差异化在于原生代码执行和深度 AI 集成。"},
+                sort_order=32,
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             ),
         ]
 
+        # 获取功能演示和数据分析示例文档的 ID，用于创建 doclink
+        demo_doc = documents.get("功能演示")
+        data_doc = documents.get("数据分析示例")
+
+        if demo_doc:
+            blocks.append(
+                DocumentBlock(
+                    id=str(uuid4()),
+                    document_id=guide_doc.id,
+                    block_type="link_to_document",
+                    content={"targetDocId": str(demo_doc.id), "icon": "🎯", "title": "功能演示"},
+                    sort_order=33,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
+        if data_doc:
+            blocks.append(
+                DocumentBlock(
+                    id=str(uuid4()),
+                    document_id=guide_doc.id,
+                    block_type="link_to_document",
+                    content={"targetDocId": str(data_doc.id), "icon": "📊", "title": "数据分析示例"},
+                    sort_order=34,
+                    created_at=datetime.utcnow(),
+                    updated_at=datetime.utcnow(),
+                )
+            )
+
         for block in blocks:
             session.add(block)
+
+    # 为"功能演示"文档创建空 blocks
+    demo_doc = documents.get("功能演示")
+    if demo_doc:
+        block = DocumentBlock(
+            id=str(uuid4()),
+            document_id=demo_doc.id,
+            block_type="paragraph",
+            content={"text": ""},
+            sort_order=1,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        session.add(block)
+
+    # 为"数据分析示例"文档创建空 blocks
+    data_doc = documents.get("数据分析示例")
+    if data_doc:
+        block = DocumentBlock(
+            id=str(uuid4()),
+            document_id=data_doc.id,
+            block_type="paragraph",
+            content={"text": ""},
+            sort_order=1,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        )
+        session.add(block)
 
     logger.info(f"创建了 {len(documents)} 个文档")

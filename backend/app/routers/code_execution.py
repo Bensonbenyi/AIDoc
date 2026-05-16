@@ -44,19 +44,33 @@ async def execute_code(
     """在 Docker 容器中执行代码并返回结果"""
     result = await docker_execution_service.execute_code(data.source_code)
 
-    execution = await code_execution_service.save_execution(
-        db=db,
-        block_id=data.block_id,
-        document_id=data.document_id,
-        language=data.language,
-        source_code=data.source_code,
-        status=result["status"],
-        stdout=result["stdout"],
-        stderr=result["stderr"],
-        execution_time_ms=result["execution_time_ms"],
-    )
-    await db.commit()
-    return execution
+    try:
+        execution = await code_execution_service.save_execution(
+            db=db,
+            block_id=data.block_id,
+            document_id=data.document_id,
+            language=data.language,
+            source_code=data.source_code,
+            status=result["status"],
+            stdout=result["stdout"],
+            stderr=result["stderr"],
+            execution_time_ms=result["execution_time_ms"],
+        )
+        await db.commit()
+        return execution
+    except Exception:
+        # 保存失败不影响返回执行结果
+        await db.rollback()
+        from datetime import datetime
+        from app.schemas.code_execution import ExecutionStatus
+        return CodeExecuteResponse(
+            id=uuid.uuid4(),
+            status=ExecutionStatus(result["status"]),
+            stdout=result["stdout"],
+            stderr=result["stderr"],
+            execution_time_ms=result["execution_time_ms"],
+            created_at=datetime.utcnow(),
+        )
 
 
 @router.post("", response_model=CodeExecuteResponse)

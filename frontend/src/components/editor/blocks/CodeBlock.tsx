@@ -19,6 +19,9 @@ interface Props {
   onUpdate: (content: Record<string, unknown>) => void;
 }
 
+const MIN_EDITOR_HEIGHT = 120;
+const MAX_EDITOR_HEIGHT = 320;
+
 export function CodeBlock({ block, onUpdate }: Props) {
   const [code, setCode] = useState((block.content.code as string) || '');
   const [output, setOutput] = useState(block.content.output as string | undefined);
@@ -27,6 +30,7 @@ export function CodeBlock({ block, onUpdate }: Props) {
     (block.content.status as 'idle' | 'running' | 'success' | 'error') || 'idle'
   );
   const [execTime, setExecTime] = useState(block.content.executionTime as string | undefined);
+  const [editorHeight, setEditorHeight] = useState(MIN_EDITOR_HEIGHT);
 
   // 当 block.content 从外部更新时同步本地状态
   useEffect(() => {
@@ -148,15 +152,15 @@ export function CodeBlock({ block, onUpdate }: Props) {
   };
 
   const getButtonClass = () => {
-    if (status === 'running') return 'bg-yellow-500/20 text-yellow-400';
-    if (status === 'success') return 'bg-green-500/20 text-green-400 hover:bg-green-500/30';
-    if (status === 'error') return 'bg-red-500/20 text-red-400 hover:bg-red-500/30';
-    return 'bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30';
+    if (status === 'running') return 'bg-yellow-100 text-yellow-700';
+    if (status === 'success') return 'bg-green-100 text-green-700 hover:bg-green-200';
+    if (status === 'error') return 'bg-red-100 text-red-700 hover:bg-red-200';
+    return 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200';
   };
 
   return (
     <div
-      className="rounded-lg border border-border overflow-hidden bg-[#1e1e2e]"
+      className="rounded-lg border border-slate-200 overflow-hidden bg-white shadow-sm"
       onClick={(e) => e.stopPropagation()}
       onKeyDownCapture={(e) => {
         // 让 Monaco Editor 自己处理所有键盘事件，阻止父级 SortableBlock 拦截
@@ -164,10 +168,10 @@ export function CodeBlock({ block, onUpdate }: Props) {
       }}
     >
       {/* 工具栏 */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#181825] border-b border-white/5">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-[#cdd6f4] font-mono">Python</span>
-          <span className="flex items-center gap-1 text-xs text-[#a6adc8]">
+          <span className="text-xs text-slate-700 font-mono">Python</span>
+          <span className="flex items-center gap-1 text-xs text-slate-500">
             <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
             {st.icon} {st.text}
           </span>
@@ -176,7 +180,7 @@ export function CodeBlock({ block, onUpdate }: Props) {
           <button
             onClick={askAI}
             disabled={!code.trim()}
-            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-all bg-purple-100 text-purple-700 hover:bg-purple-200 disabled:opacity-40 disabled:cursor-not-allowed"
             title="AI 解释代码"
           >
             <Sparkles className="w-3 h-3" />
@@ -193,11 +197,11 @@ export function CodeBlock({ block, onUpdate }: Props) {
       </div>
 
       {/* Monaco Editor */}
-      <div className="min-h-[120px]">
+      <div className="min-h-[120px] max-h-[320px] overflow-hidden">
         <MonacoEditor
-          height="120px"
+          height={editorHeight}
           language="python"
-          theme="vs-dark"
+          theme="light"
           value={code}
           onChange={handleCodeChange}
           options={{
@@ -215,9 +219,9 @@ export function CodeBlock({ block, onUpdate }: Props) {
             overviewRulerLanes: 0,
             hideCursorInOverviewRuler: true,
             scrollbar: {
-              vertical: 'hidden',
+              vertical: 'auto',
               horizontal: 'auto',
-              verticalScrollbarSize: 0,
+              verticalScrollbarSize: 8,
             },
             lineDecorationsWidth: 0,
             lineNumbersMinChars: 3,
@@ -225,11 +229,8 @@ export function CodeBlock({ block, onUpdate }: Props) {
           onMount={(editor) => {
             // 自动调整高度：监听内容变化
             const updateHeight = () => {
-              const contentHeight = Math.max(120, editor.getContentHeight() + 16);
-              const domNode = editor.getDomNode();
-              if (domNode) {
-                domNode.style.height = `${contentHeight}px`;
-              }
+              const contentHeight = editor.getContentHeight() + 16;
+              setEditorHeight(Math.min(MAX_EDITOR_HEIGHT, Math.max(MIN_EDITOR_HEIGHT, contentHeight)));
               editor.layout();
             };
             editor.onDidContentSizeChange(updateHeight);
@@ -239,21 +240,24 @@ export function CodeBlock({ block, onUpdate }: Props) {
       </div>
 
       {/* 输出面板 */}
-      {(output || stderr || status === 'running') && (
-        <div className="border-t border-white/5">
-          <div className="flex items-center justify-between px-3 py-1 bg-[#11111b]">
-            <span className="text-xs text-[#a6adc8]">Output</span>
-            {execTime && <span className="text-xs text-[#6c7086]">{execTime}</span>}
+      {(output || stderr || status === 'running' || status === 'success' || status === 'error') && (
+        <div className="border-t border-slate-200 bg-slate-50">
+          <div className="flex items-center justify-between px-3 py-1 bg-slate-100">
+            <span className="text-xs text-slate-500">Output</span>
+            {execTime && <span className="text-xs text-slate-400">{execTime}</span>}
           </div>
-          <div className="px-3 py-2 text-xs font-mono whitespace-pre-wrap max-h-[200px] overflow-auto">
+          <div className="px-3 py-2 text-xs font-mono max-h-[200px] overflow-auto">
             {output && (
-              <pre className="text-[#a6e3a1]">{output}</pre>
+              <pre className="m-0 whitespace-pre-wrap break-words leading-relaxed text-green-700">{output}</pre>
             )}
             {stderr && (
-              <pre className="text-[#f38ba8]">{stderr}</pre>
+              <pre className="m-0 whitespace-pre-wrap break-words leading-relaxed text-red-700">{stderr}</pre>
             )}
             {status === 'running' && !output && !stderr && (
-              <span className="text-[#a6adc8]">执行中...</span>
+              <span className="text-slate-500">执行中...</span>
+            )}
+            {status === 'success' && !output && !stderr && (
+              <span className="text-green-700">执行成功（无输出）</span>
             )}
           </div>
         </div>
