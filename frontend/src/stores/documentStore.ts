@@ -44,6 +44,8 @@ interface DocumentState {
   ) => Promise<string>;
   replaceBlockFromSlash: (blockId: string, blockType: string, content?: Record<string, unknown>) => Promise<string>;
   addDocLinkBlock: (targetNode: DocumentTreeNode, docId: string, targetIndex?: number) => Promise<void>;
+  deleteDocument: (docId: string) => Promise<void>;
+  renameDocument: (docId: string, newTitle: string) => Promise<void>;
   saveDocument: () => Promise<void>;
 }
 
@@ -489,6 +491,66 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       }));
     } catch (error) {
       console.error('创建文档链接 block 失败:', error);
+    }
+  },
+
+  deleteDocument: async (docId: string) => {
+    // 乐观更新：先更新本地状态
+    const removeNodeFromTree = (nodes: DocumentTreeNode[]): DocumentTreeNode[] => {
+      return nodes
+        .filter((n) => n.id !== docId)
+        .map((n) => ({
+          ...n,
+          children: removeNodeFromTree(n.children),
+        }));
+    };
+
+    // 保存当前状态用于回滚
+    const prevState = {
+      tree: get().tree,
+      currentDocId: get().currentDocId,
+      currentDocMeta: get().currentDocMeta,
+      blocks: get().blocks,
+      documentsById: get().documentsById,
+      historyByDocId: get().historyByDocId,
+    };
+
+    set((s) => {
+      const { [docId]: _removedDoc, ...restDocs } = s.documentsById;
+      const { [docId]: _removedHistory, ...restHistory } = s.historyByDocId;
+      return {
+        tree: removeNodeFromTree(s.tree),
+        documentsById: restDocs,
+        historyByDocId: restHistory,
+        currentDocId: s.currentDocId === docId ? null : s.currentDocId,
+        currentDocMeta: s.currentDocId === docId ? null : s.currentDocMeta,
+        blocks: s.currentDocId === docId ? [] : s.blocks,
+      };
+    });
+
+    // 如果删除的是当前文档，取消挂起的自动保存
+    if (prevState.currentDocId === docId && autoSaveTimer) {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = null;
+    }
+
+    try {
+      await documentsAPI.delete(docId);
+    } catch (error) {
+      console.error('删除文档失败:', error);
+      // 回滚本地状态
+      set(prevState);
+      throw error;
+    }
+  },
+
+  renameDocument: async (docId: string, newTitle: string) => {
+    try {
+      await documentsAPI.update(docId, { title: newTitle });
+      await get().loadTree();
+    } catch (error) {
+      console.error('重命名失败:', error);
+      throw error;
     }
   },
 
