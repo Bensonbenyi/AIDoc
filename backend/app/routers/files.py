@@ -5,10 +5,11 @@
 import uuid
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
+from app.config import settings
 from app.dependencies import get_db
 from app.schemas.file import FileUploadResponse
 from app.services import file_service
@@ -74,8 +75,11 @@ async def get_file(
         raise HTTPException(status_code=400, detail="无效的 file_id")
 
     try:
-        file_path, file_asset = await file_service.get_file_path(db, file_uuid)
+        if settings.FILE_STORAGE_TYPE in {"s3", "oss"}:
+            signed_url = await file_service.get_file_url(db, file_uuid)
+            return RedirectResponse(url=signed_url)
 
+        file_path, file_asset = await file_service.get_file_path(db, file_uuid)
         if not file_path.exists():
             raise HTTPException(status_code=404, detail="文件不存在")
 
