@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Upload, Play, Pause, Volume2, VolumeX, Loader2 } from 'lucide-react';
+import { Upload, Play, Pause, Volume2, VolumeX, Loader2, X } from 'lucide-react';
 import { DocumentBlock } from '@/types/block';
 import { uploadFile, filesAPI, type FileUploadProgress } from '@/lib/api';
 import { useDocumentStore } from '@/stores/documentStore';
@@ -24,6 +24,7 @@ export function AudioBlock({ block, onUpdate }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileUrl = block.content.fileUrl as string | undefined;
+  const fileId = block.content.fileId as string | undefined;
   const fileName = block.content.fileName as string | undefined;
 
   // 同步音频状态
@@ -85,6 +86,19 @@ export function AudioBlock({ block, onUpdate }: Props) {
     setVolume(vol);
     setIsMuted(vol === 0);
   }, []);
+
+  const handleRemove = useCallback(async () => {
+    setUploadError(null);
+    if (fileId) {
+      try {
+        await filesAPI.delete(fileId);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : '删除失败');
+        return;
+      }
+    }
+    onUpdate({});
+  }, [fileId, onUpdate]);
 
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -190,6 +204,13 @@ export function AudioBlock({ block, onUpdate }: Props) {
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Volume2 className="h-4 w-4 shrink-0" />
         <span className="truncate">{fileName || '音频文件'}</span>
+        <button
+          onClick={handleRemove}
+          className="ml-auto h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+          title="移除音频"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
 
       {/* 播放控制 */}
@@ -236,6 +257,9 @@ export function AudioBlock({ block, onUpdate }: Props) {
           className="w-16 h-1 accent-primary cursor-pointer"
         />
       </div>
+      {uploadError && (
+        <p className="text-xs text-destructive">{uploadError}</p>
+      )}
     </div>
   );
 }

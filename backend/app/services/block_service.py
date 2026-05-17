@@ -16,6 +16,7 @@ from app.models.chart_3d import Chart3D
 from app.models.code_execution import CodeExecution
 from app.models.file_asset import FileAsset
 from app.schemas.block import BlockCreate, BlockUpdate
+from app.services import file_service
 
 VALID_BLOCK_TYPES = {
     "paragraph", "heading_1", "heading_2", "heading_3",
@@ -97,6 +98,12 @@ async def batch_save_blocks(
         if block_data.id is not None and block_data.id in old_blocks_map:
             # 更新已有 block（直接从 map 获取，无需额外查询）
             existing = old_blocks_map[block_data.id]
+            if block_data.content is not None:
+                await _delete_replaced_file_asset(
+                    db,
+                    old_content=existing.content,
+                    new_content=block_data.content,
+                )
             existing.block_type = block_type
             existing.content = block_data.content
             existing.properties = block_data.properties
@@ -127,6 +134,11 @@ async def update_block(
         raise ValueError("Block 不存在")
 
     if data.content is not None:
+        await _delete_replaced_file_asset(
+            db,
+            old_content=block.content,
+            new_content=data.content,
+        )
         block.content = data.content
     if data.properties is not None:
         block.properties = data.properties
@@ -165,13 +177,46 @@ async def _delete_block_related_data(
         delete(Chart3D).where(Chart3D.block_id.in_(block_ids))
     )
 
-    # 文件和代码执行记录也依附于 block；删除 block 时一并清理数据库记录。
-    await db.execute(
-        delete(FileAsset).where(FileAsset.block_id.in_(block_ids))
+    # 文件记录依附于 block；删除 block 时同步删除 Supabase/S3/本地存储对象。
+    file_result = await db.execute(
+        select(FileAsset).where(FileAsset.block_id.in_(block_ids))
     )
+    for file_asset in file_result.scalars().all():
+        await file_service.delete_file_asset(db, file_asset, commit=False)
+
     await db.execute(
         delete(CodeExecution).where(CodeExecution.block_id.in_(block_ids))
     )
+
+
+def _content_file_id(content: dict | None) -> uuid.UUID | None:
+    """Extract a persisted file id from block content if present."""
+    if not isinstance(content, dict):
+        return None
+    raw_file_id = content.get("fileId") or content.get("file_id")
+    if not raw_file_id:
+        return None
+    try:
+        return uuid.UUID(str(raw_file_id))
+    except ValueError:
+        return None
+
+
+async def _delete_replaced_file_asset(
+    db: AsyncSession,
+    *,
+    old_content: dict | None,
+    new_content: dict | None,
+) -> None:
+    """Delete the old stored file when a block no longer references it."""
+    old_file_id = _content_file_id(old_content)
+    new_file_id = _content_file_id(new_content)
+    if old_file_id is None or old_file_id == new_file_id:
+        return
+
+    file_asset = await db.get(FileAsset, old_file_id)
+    if file_asset is not None:
+        await file_service.delete_file_asset(db, file_asset, commit=False)
 
 
 async def get_blocks_by_document(

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Upload, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2 } from 'lucide-react';
+import { Upload, Play, Pause, Volume2, VolumeX, Maximize, Minimize, Loader2, X } from 'lucide-react';
 import { DocumentBlock } from '@/types/block';
 import { uploadFile, filesAPI, type FileUploadProgress } from '@/lib/api';
 import { useDocumentStore } from '@/stores/documentStore';
@@ -26,6 +26,7 @@ export function VideoBlock({ block, onUpdate }: Props) {
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const fileUrl = block.content.fileUrl as string | undefined;
+  const fileId = block.content.fileId as string | undefined;
   const fileName = block.content.fileName as string | undefined;
   const posterUrl = block.content.posterUrl as string | undefined;
 
@@ -107,6 +108,19 @@ export function VideoBlock({ block, onUpdate }: Props) {
       container.requestFullscreen();
     }
   }, []);
+
+  const handleRemove = useCallback(async () => {
+    setUploadError(null);
+    if (fileId) {
+      try {
+        await filesAPI.delete(fileId);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : '删除失败');
+        return;
+      }
+    }
+    onUpdate({});
+  }, [fileId, onUpdate]);
 
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -271,8 +285,19 @@ export function VideoBlock({ block, onUpdate }: Props) {
           >
             {isFullscreen ? <Minimize className="h-3.5 w-3.5" /> : <Maximize className="h-3.5 w-3.5" />}
           </button>
+
+          <button
+            onClick={handleRemove}
+            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:bg-destructive hover:text-destructive-foreground transition-colors"
+            title="移除视频"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
+      {uploadError && (
+        <div className="bg-background px-2 pb-2 text-xs text-destructive">{uploadError}</div>
+      )}
     </div>
   );
 }

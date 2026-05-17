@@ -167,6 +167,18 @@ async def delete_file(db: AsyncSession, file_id: uuid.UUID) -> None:
     if not file_asset:
         raise FileNotFoundError(f"文件不存在: {file_id}")
 
+    await delete_file_asset(db, file_asset)
+
+    logger.info(f"文件记录已删除: {file_id}")
+
+
+async def delete_file_asset(
+    db: AsyncSession,
+    file_asset: FileAsset,
+    *,
+    commit: bool = True,
+) -> None:
+    """删除存储对象和 FileAsset 记录。"""
     storage_type = settings.FILE_STORAGE_TYPE
 
     # 删除存储中的文件
@@ -183,9 +195,10 @@ async def delete_file(db: AsyncSession, file_id: uuid.UUID) -> None:
 
     # 删除数据库记录
     await db.delete(file_asset)
-    await db.commit()
+    if commit:
+        await db.commit()
 
-    logger.info(f"文件记录已删除: {file_id}")
+    logger.info(f"文件记录已删除: {file_asset.id}")
 
 
 # ==============================
