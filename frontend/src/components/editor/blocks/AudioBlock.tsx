@@ -37,12 +37,17 @@ export function AudioBlock({ block, onUpdate }: Props) {
     const onEnded = () => setIsPlaying(false);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onError = () => {
+      setIsPlaying(false);
+      setUploadError('音频无法加载，请检查文件格式或重新上传');
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMetadata);
     audio.addEventListener('ended', onEnded);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('pause', onPause);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
@@ -50,6 +55,7 @@ export function AudioBlock({ block, onUpdate }: Props) {
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('error', onError);
     };
   }, [fileUrl]);
 
@@ -59,7 +65,11 @@ export function AudioBlock({ block, onUpdate }: Props) {
     if (isPlaying) {
       audio.pause();
     } else {
-      audio.play();
+      setUploadError(null);
+      audio.play().catch(() => {
+        setIsPlaying(false);
+        setUploadError('音频无法播放，请检查文件格式或重新上传');
+      });
     }
   }, [isPlaying, fileUrl]);
 

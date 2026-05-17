@@ -40,12 +40,17 @@ export function VideoBlock({ block, onUpdate }: Props) {
     const onEnded = () => setIsPlaying(false);
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
+    const onError = () => {
+      setIsPlaying(false);
+      setUploadError('视频无法加载，请检查文件编码或重新上传');
+    };
 
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('loadedmetadata', onLoadedMetadata);
     video.addEventListener('ended', onEnded);
     video.addEventListener('play', onPlay);
     video.addEventListener('pause', onPause);
+    video.addEventListener('error', onError);
 
     return () => {
       video.removeEventListener('timeupdate', onTimeUpdate);
@@ -53,6 +58,7 @@ export function VideoBlock({ block, onUpdate }: Props) {
       video.removeEventListener('ended', onEnded);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('error', onError);
     };
   }, [fileUrl]);
 
@@ -71,7 +77,11 @@ export function VideoBlock({ block, onUpdate }: Props) {
     if (isPlaying) {
       video.pause();
     } else {
-      video.play();
+      setUploadError(null);
+      video.play().catch(() => {
+        setIsPlaying(false);
+        setUploadError('视频无法播放，请检查文件编码或重新上传');
+      });
     }
   }, [isPlaying, fileUrl]);
 

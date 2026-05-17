@@ -7,6 +7,7 @@
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import UploadFile
 from sqlalchemy import select
@@ -136,6 +137,15 @@ async def get_file_url(db: AsyncSession, file_id: uuid.UUID) -> str:
         return file_asset.file_url
 
 
+async def get_file_asset(db: AsyncSession, file_id: uuid.UUID) -> FileAsset:
+    """获取文件记录。"""
+    result = await db.execute(select(FileAsset).where(FileAsset.id == file_id))
+    file_asset = result.scalar_one_or_none()
+    if not file_asset:
+        raise FileNotFoundError(f"文件不存在: {file_id}")
+    return file_asset
+
+
 async def get_file_path(db: AsyncSession, file_id: uuid.UUID) -> tuple[Path, FileAsset]:
     """
     获取本地文件路径（仅用于 local 存储）
@@ -235,6 +245,26 @@ def _get_s3_client():
     if settings.S3_ENDPOINT:
         kwargs["endpoint_url"] = settings.S3_ENDPOINT
     return boto3.client("s3", **kwargs)
+
+
+async def open_s3_object(
+    file_asset: FileAsset,
+    range_header: str | None = None,
+) -> dict[str, Any]:
+    """打开 S3 对象，支持浏览器媒体播放器的 Range 请求。"""
+    import asyncio
+
+    def _open():
+        client = _get_s3_client()
+        kwargs: dict[str, Any] = {
+            "Bucket": settings.S3_BUCKET,
+            "Key": file_asset.file_url,
+        }
+        if range_header:
+            kwargs["Range"] = range_header
+        return client.get_object(**kwargs)
+
+    return await asyncio.to_thread(_open)
 
 
 async def _save_to_s3(content: bytes, filename: str, content_type: str | None) -> str:

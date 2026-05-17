@@ -3,9 +3,10 @@
 """
 
 import uuid
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, UploadFile
+from fastapi.responses import FileResponse, RedirectResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from loguru import logger
 
@@ -61,6 +62,7 @@ async def upload_file(
 @router.get("/{file_id}")
 async def get_file(
     file_id: str,
+    range_header: str | None = Header(None, alias="Range"),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -75,7 +77,34 @@ async def get_file(
         raise HTTPException(status_code=400, detail="无效的 file_id")
 
     try:
-        if settings.FILE_STORAGE_TYPE in {"s3", "oss"}:
+        if settings.FILE_STORAGE_TYPE == "s3":
+            file_asset = await file_service.get_file_asset(db, file_uuid)
+            s3_object = await file_service.open_s3_object(file_asset, range_header)
+            body = s3_object["Body"]
+
+            def iter_file():
+                try:
+                    for chunk in iter(lambda: body.read(1024 * 1024), b""):
+                        yield chunk
+                finally:
+                    body.close()
+
+            headers = {
+                "Accept-Ranges": "bytes",
+                "Content-Length": str(s3_object.get("ContentLength", file_asset.file_size)),
+                "Content-Disposition": f"inline; filename*=UTF-8''{quote(file_asset.file_name)}",
+            }
+            if content_range := s3_object.get("ContentRange"):
+                headers["Content-Range"] = content_range
+
+            return StreamingResponse(
+                iter_file(),
+                status_code=206 if "Content-Range" in headers else 200,
+                media_type=file_asset.file_type,
+                headers=headers,
+            )
+
+        if settings.FILE_STORAGE_TYPE == "oss":
             signed_url = await file_service.get_file_url(db, file_uuid)
             return RedirectResponse(url=signed_url)
 
